@@ -1,15 +1,3 @@
-# ipo-eda
+# Convert SEC filings to CSV
 
-To install dependencies:
-
-```bash
-bun install
-```
-
-To run:
-
-```bash
-bun run 
-```
-
-This project was created using `bun init` in bun v1.2.20. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+Many SEC filings have XBRL embedded in the html. This script attempts to grab the numerical data from that and put it into a CSV.
