@@ -1,0 +1,11 @@
+{
+    "name": "ipo-eda",
+    "private": true,
+    "devDependencies": {
+        "@types/bun": "latest",
+        "jsdom": "^27.0.0"
+    },
+    "peerDependencies": {
+        "typescript": "^5"
+    }
+}
