@@ -10,10 +10,40 @@ def process_xbrl_file(file_path):
 
     return parse_inline_xbrl(content)
 
-def analyze_prospectus_keywords(file_name):
+def filter_xbrl_df(df):
+    # Define key patterns to match
+    key_patterns = [
+        'Revenue', 'CostOfGoods', 'CostOfRevenue', 'GrossProfit', 
+        'OperatingIncome', 'NetIncome', 'EarningsPerShare',
+        'Assets', 'Cash', 'AccountsReceivable', 'Inventory',
+        'Liabilities', 'StockholdersEquity', 'RetainedEarnings',
+        'NetCashProvidedByUsedInOperating', 'NetCashProvidedByUsedInInvesting', 
+        'NetCashProvidedByUsedInFinancing',
+        'WeightedAverageNumberOfShares', 'SharesOutstanding',
+        'DepreciationAndAmortization', 'ShareBasedCompensation',
+        'InterestExpense', 'IncomeTaxExpense'
+    ]
+
+    df = df[df['Is_Null'] == 'false'] # Drop rows with null = true
+    df = df[df['Taxonomy_Prefix'] == 'us-gaap'] # Only want us-gaap data
+    df['Value'] = pd.to_numeric(df['Value'].str.replace(',', ''), errors='coerce') # Convert to number, otherwise drop string info
+    df = df.dropna(subset=['Value']) # Drop nulls
+    df = df.drop_duplicates()
+    df['Element_Name'] = df['Element_Name'].str.replace("us-gaap:", '') # Remove us-gaap prefix
+
+    # Create a pattern-based filter
+    pattern = '|'.join(key_patterns)
+    df_filtered = df[df['Element_Local_Name'].str.contains(pattern, case=False, na=False)].copy()
+    df_deduped = df_filtered.drop_duplicates(
+        subset=['Element_Local_Name', 'Period_Start', 'Period_End', 'Instant_Date', 'Entity_ID'],
+        keep='first'
+    )
+    return df_deduped
+    
+
+def analyze_prospectus_keywords(file_path):
     # Load HTML
-    path = f'./sec-docs/{file_name}'
-    with open(path, 'r', encoding='utf-8') as f:
+    with open(file_path, 'r', encoding='utf-8') as f:
         html_content = f.read()
     
     # Parse HTML
@@ -49,35 +79,70 @@ def analyze_prospectus_keywords(file_name):
     
     return list(keyword_counts.items())
 
-def clean_df(df):
-    # Define key patterns to match
-    key_patterns = [
-        'Revenue', 'CostOfGoods', 'CostOfRevenue', 'GrossProfit', 
-        'OperatingIncome', 'NetIncome', 'EarningsPerShare',
-        'Assets', 'Cash', 'AccountsReceivable', 'Inventory',
-        'Liabilities', 'StockholdersEquity', 'RetainedEarnings',
-        'NetCashProvidedByUsedInOperating', 'NetCashProvidedByUsedInInvesting', 
-        'NetCashProvidedByUsedInFinancing',
-        'WeightedAverageNumberOfShares', 'SharesOutstanding',
-        'DepreciationAndAmortization', 'ShareBasedCompensation',
-        'InterestExpense', 'IncomeTaxExpense'
-    ]
+def generate_xbrl_dataframe(parsed_xbrl_items):
+    # Extract desired attributes from xbrl
+    rows = []
+    for item in parsed_xbrl_items:
+        element_name = item['_attributes'].get('name', '')
+        period_end = item['_context'].get('context_period_enddate', '')
+        instant_date = item['_context'].get('context_period_instant', '')
+        
+        # Use period_end if available, otherwise instant_date, otherwise no date
+        date_part = period_end or instant_date or ''
+        
+        # Create combined element name with date
+        if date_part:
+            combined_element_name = f"{element_name}_{date_part}"
+        else:
+            combined_element_name = element_name
 
-    df = df[df['Is_Null'] == 'false'] # Drop rows with null = true
-    df = df[df['Taxonomy_Prefix'] == 'us-gaap'] # Only want us-gaap data
-    df['Value'] = pd.to_numeric(df['Value'].str.replace(',', ''), errors='coerce') # Convert to number, otherwise drop string info
-    df = df.dropna(subset=['Value']) # Drop nulls
-    df = df.drop_duplicates()
-    df['Element_Name'] = df['Element_Name'].str.replace("us-gaap:", '') # Remove us-gaap prefix
+        row = {
+            'Fact_ID': item['_attributes'].get('id', ''),
+            'Element_Name': item['_attributes'].get('name', ''),
+            'Value': item.get('_val', ''),
+            'Unit': item['_attributes'].get('unitref', ''),
+            'Is_Null': item['_attributes'].get('xs:nil', 'false'),
+            'Context_Ref': item['_context'].get('_contextref', ''),
+            'Entity_ID': item['_context'].get('context_entity_identifier', ''),
+            'Period_Start': item['_context'].get('context_period_startdate', ''),
+            'Period_End': item['_context'].get('context_period_enddate', ''),
+            'Instant_Date': item['_context'].get('context_period_instant', ''),
+            'Taxonomy_Prefix': item['_attributes'].get('name', '').split(':')[0] if ':' in item['_attributes'].get('name', '') else '',
+            'Element_Local_Name': item['_attributes'].get('name', '').split(':')[-1] if ':' in item['_attributes'].get('name', '') else item['_attributes'].get('name', ''),
+            'Combined_Element_Name': combined_element_name,
+            'Date_Part': date_part,
+            'Data_Type': 'xbrl'
+        }
+        rows.append(row)
+        
+    df = pd.DataFrame(rows)
+    return filter_xbrl_df(df)
 
-    # Create a pattern-based filter
-    pattern = '|'.join(key_patterns)
-    df_filtered = df[df['Element_Local_Name'].str.contains(pattern, case=False, na=False)].copy()
-    df_deduped = df_filtered.drop_duplicates(
-        subset=['Element_Local_Name', 'Period_Start', 'Period_End', 'Instant_Date', 'Entity_ID'],
-        keep='first'
-    )
-    return df_deduped
+
+def generate_keyword_dataframe(keywords_frequencies):
+    # Add word list extraction to rows
+    rows = []
+    for word_and_frequency in keywords_frequencies:
+        row = {
+            'Fact_ID': '0000',
+            'Element_Name': word_and_frequency[0],
+            'Value': word_and_frequency[1],
+            'Unit': 'count',
+            'Is_Null': 'false',
+            'Context_Ref': 'frequency',
+            'Entity_ID': '0000',
+            'Period_Start': '',
+            'Period_End': '',
+            'Instant_Date': '',
+            'Taxonomy_Prefix': 'custom',
+            'Element_Local_Name': 'keyword_frequency',
+            'Combined_Element_Name': '',
+            'Date_Part': '',
+            'Data_Type': 'keyword'
+        }
+        rows.append(row)
+       
+    return pd.DataFrame(rows)
 
 def main():
     # Grab all files
@@ -85,115 +150,15 @@ def main():
 
     # Loop through each
     for doc_name in sec_docs:
-        # Process xbrl data
-        xbrl_data = process_xbrl_file(f"./sec-docs/{doc_name}")
+        file_path = f"./sec-docs/{doc_name}"
+        parsed_xbrl_file = process_xbrl_file(file_path)
+        keyword_frequencies = analyze_prospectus_keywords(file_path)
 
-        all_dfs = []
+        xbrl_df = generate_xbrl_dataframe(parsed_xbrl_file)
+        keyword_df = generate_keyword_dataframe(keyword_frequencies)
 
-        # Extract desired attributes from xbrl
-        gaap_rows = []
-        for item in xbrl_data:
-            element_name = item['_attributes'].get('name', '')
-            period_end = item['_context'].get('context_period_enddate', '')
-            instant_date = item['_context'].get('context_period_instant', '')
-            
-            # Use period_end if available, otherwise instant_date, otherwise no date
-            date_part = period_end or instant_date or ''
-            
-            # Create combined element name with date
-            if date_part:
-                combined_element_name = f"{element_name}_{date_part}"
-            else:
-                combined_element_name = element_name
-
-            row = {
-                'Fact_ID': item['_attributes'].get('id', ''),
-                'Element_Name': item['_attributes'].get('name', ''),
-                'Value': item.get('_val', ''),
-                'Unit': item['_attributes'].get('unitref', ''),
-                'Is_Null': item['_attributes'].get('xs:nil', 'false'),
-                'Context_Ref': item['_context'].get('_contextref', ''),
-                'Entity_ID': item['_context'].get('context_entity_identifier', ''),
-                'Period_Start': item['_context'].get('context_period_startdate', ''),
-                'Period_End': item['_context'].get('context_period_enddate', ''),
-                'Instant_Date': item['_context'].get('context_period_instant', ''),
-                'Taxonomy_Prefix': item['_attributes'].get('name', '').split(':')[0] if ':' in item['_attributes'].get('name', '') else '',
-                'Element_Local_Name': item['_attributes'].get('name', '').split(':')[-1] if ':' in item['_attributes'].get('name', '') else item['_attributes'].get('name', ''),
-                'Combined_Element_Name': combined_element_name,
-                'Date_Part': date_part,
-                'Data_Type': 'xbrl'
-            }
-            gaap_rows.append(row)
-        
-        gaap_specific_df = pd.DataFrame(gaap_rows)
-        cleaned_gaap_specific_df = clean_df(gaap_specific_df)
-
-        # Add word list extraction to rows
-        keyword_rows = []
-        wordlist = analyze_prospectus_keywords(doc_name)
-        for word_and_frequency in wordlist:
-            row = {
-                'Fact_ID': '0000',
-                'Element_Name': word_and_frequency[0],
-                'Value': word_and_frequency[1],
-                'Unit': 'count',
-                'Is_Null': 'false',
-                'Context_Ref': 'frequency',
-                'Entity_ID': '0000',
-                'Period_Start': '',
-                'Period_End': '',
-                'Instant_Date': '',
-                'Taxonomy_Prefix': 'custom',
-                'Element_Local_Name': 'keyword_frequency',
-                'Combined_Element_Name': '',
-                'Date_Part': '',
-                'Data_Type': 'keyword'
-            }
-            keyword_rows.append(row)
-       
-        keyword_df = pd.DataFrame(keyword_rows)
-
-        combined_df = pd.concat([cleaned_gaap_specific_df, keyword_df]); 
-        
-        # pivoted_df = clean_df.pivot_table(
-        #     index='Document',
-        #     columns='Element_name',
-        #     values='Value',
-        #     aggfunc
-        # )
-        print(combined_df.head())
+        combined_df = pd.concat([xbrl_df, keyword_df])
         combined_df.to_csv(f'./csv/eda.csv', index=False)
-    
-    # combined_df = pd.concat(all_dfs, ignore_index=True)
-    # print(combined_df.head())
-    
-    # # Separate and pivot both data types
-    # keyword_df = combined_df[combined_df['Data_Type'] == 'keyword']
-    # xbrl_df = combined_df[combined_df['Data_Type'] == 'xbrl']
-    
-    # # Pivot keywords
-    # keyword_pivot = keyword_df.pivot_table(
-    #     index='Document', 
-    #     columns='Element_Name', 
-    #     values='Value', 
-    #     fill_value=0
-    # )
-    
-    # # Add prefix to keyword columns to distinguish them
-    # keyword_pivot.columns = [f'keyword_{col}' for col in keyword_pivot.columns]
-    
-    # # Pivot financial data (simplified - you may want to be more specific)
-    # xbrl_df['Value_Numeric'] = pd.to_numeric(xbrl_df['Value'], errors='coerce')
-    # financial_pivot = xbrl_df.groupby(['Document', 'Element_Local_Name'])['Value_Numeric'].first().unstack(fill_value=0)
-    
-    # # Add prefix to financial columns
-    # financial_pivot.columns = [f'financial_{col}' for col in financial_pivot.columns]
-    
-    # # Combine both pivoted datasets
-    # final_df = keyword_pivot.join(financial_pivot, how='outer')
-    
-    # print("Combined pivot table:")
-    # print(final_df.head())
 
 main() 
 
