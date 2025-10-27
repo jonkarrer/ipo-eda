@@ -174,18 +174,15 @@ def filter_out_columns(df):
     return df_filtered
 
 def pivot_df(df):
-    # Create current columns
     current_cols = df.set_index('Element_Name')['Value'].add_suffix('_Current')
-
-    # Create trend columns  
     trend_cols = df.set_index('Element_Name')['Trend'].add_suffix('_Trend')
-
-    # Combine into single row
     result = pd.concat([current_cols, trend_cols]).to_frame().T
 
-    # Add back the date and metadata
     result['Instant_Date'] = df['Instant_Date'].iloc[0]
     result['Data_Type'] = df['Data_Type'].iloc[0]
+    result = result.dropna(axis=1, how='any')
+
+    return result
 
 def main():
     # Grab all files
@@ -208,12 +205,6 @@ def main():
         final_df = filter_out_columns(concat_df)
         pivoted_df = pivot_df(final_df)
 
-
-        # final_df.to_csv(f'./csv/final_eda.csv', index=False)
         pivoted_df.to_csv(f'./csv/pivoted_eda.csv', index=False)
 
 main() 
-
-
-
-
