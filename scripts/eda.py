@@ -144,6 +144,35 @@ def generate_keyword_dataframe(keywords_frequencies):
        
     return pd.DataFrame(rows)
 
+def convert_dates_to_datetimes(combined_df):
+    combined_df['Period_Start'] = pd.to_datetime(combined_df['Period_Start'])
+    combined_df['Period_End'] = pd.to_datetime(combined_df['Period_End'])
+    combined_df['Instant_Date'] = pd.to_datetime(combined_df['Instant_Date'])
+    return combined_df
+
+def create_trend_column(df, element_name):
+    column = 'Value'
+    
+    # Create trend column
+    df_sorted = df.sort_values('Instant_Date', ascending=True)
+    df_sorted['Trend'] = df_sorted.groupby('Element_Name')[column].transform(lambda x: x.iloc[-1] - x.iloc[0])
+    
+    return df_sorted
+
+def filter_for_latest_date(df):
+    df_filtered = (df.sort_values('Instant_Date')
+                    .groupby('Element_Name', as_index=False)
+                    .last())
+    return df_filtered
+
+def remove_non_instant_dates(df):
+    df_filtered = df[df['Instant_Date'].notna()]
+    return df_filtered
+
+def filter_out_columns(df):
+    df_filtered = df[['Element_Name', 'Value', 'Unit', 'Trend', 'Instant_Date', 'Data_Type']]
+    return df_filtered
+
 def main():
     # Grab all files
     sec_docs = os.listdir("./sec-docs") 
@@ -157,8 +186,16 @@ def main():
         xbrl_df = generate_xbrl_dataframe(parsed_xbrl_file)
         keyword_df = generate_keyword_dataframe(keyword_frequencies)
 
-        combined_df = pd.concat([xbrl_df, keyword_df])
-        combined_df.to_csv(f'./csv/eda.csv', index=False)
+        df = convert_dates_to_datetimes(xbrl_df)
+        trend_df = create_trend_column(df, 'Cash')
+        latest_df = filter_for_latest_date(trend_df)
+        only_instant_df = remove_non_instant_dates(latest_df)
+        concat_df = pd.concat([only_instant_df, keyword_df])
+        final_df = filter_out_columns(concat_df)
+
+
+        final_df.to_csv(f'./csv/final_eda.csv', index=False)
+
 
 main() 
 
