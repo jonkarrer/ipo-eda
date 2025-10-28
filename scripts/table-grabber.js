@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import { JSDOM } from "jsdom";
 
+let keyword = "sonm";
+
 async function downloadWebpage(url) {
   // Fetch from this url
   const headers = new Headers();
@@ -11,7 +13,7 @@ async function downloadWebpage(url) {
   });
   let html = await res.text();
 
-  Bun.write("./foobar.html", html);
+  Bun.write(`./sec-docs/${keyword}.html`, html);
 }
 
 function extractTablesOnly(inputFilePath, outputFilePath) {
@@ -56,5 +58,5 @@ function extractTablesOnly(inputFilePath, outputFilePath) {
 // extractTablesOnly("./prospectus.html", "pros-output.html");
 
 downloadWebpage(
-  "https://www.sec.gov/Archives/edgar/data/923601/000149315225016914/forms-1.htm"
+  "https://www.sec.gov/Archives/edgar/data/1178697/000164117225017383/form424b4.htm"
 );

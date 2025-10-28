@@ -184,16 +184,44 @@ def pivot_df(df):
 
     return result
 
+def try_to_get_file(dir_name, file_name):
+        file_path=f'./data/sec-ipo-files/{dir_name}/{file_name}'
+        does_exist = os.path.exists(file_path)
+
+        if does_exist:
+            return file_path
+        else:
+            return False
+
 def main():
-    # Grab all files
-    sec_docs = os.listdir("./sec-docs") 
+    all_dfs = []
+    no_files_found = []
+    unparsed_symbols = []
 
-    # Loop through each
-    for doc_name in sec_docs:
-        file_path = f"./sec-docs/{doc_name}"
+    df = pd.read_csv('./data/ipo_day_summary.csv')
+    df = df[['symbol', 'url']]
+    df['url'] = df['url'].apply(lambda x: x.split('/')[-1])
+    
+    for tuple in list(df.itertuples(index=False)):
+        # Get file coordinates
+        dir_name=tuple[0]
+        file_name=tuple[1]
+
+        # Fetch the file for parsing
+        file_path = try_to_get_file(dir_name, file_name) 
+
+        # File may not exist
+        if file_path == False:
+            no_files_found.append(dir_name)
+            continue
+
+        # Parsing may fail
         parsed_xbrl_file = process_xbrl_file(file_path)
+        if len(parsed_xbrl_file) == 0:
+            unparsed_symbols.append(dir_name)
+            continue
+      
         keyword_frequencies = analyze_prospectus_keywords(file_path)
-
         xbrl_df = generate_xbrl_dataframe(parsed_xbrl_file)
         keyword_df = generate_keyword_dataframe(keyword_frequencies)
 
@@ -204,7 +232,17 @@ def main():
         concat_df = pd.concat([only_instant_df, keyword_df])
         final_df = filter_out_columns(concat_df)
         pivoted_df = pivot_df(final_df)
+        pivoted_df.to_csv(f'./data/sec-ipo-files/{dir_name}/pivot_table.csv')
+        all_dfs.append(pivoted_df)
 
-        pivoted_df.to_csv(f'./csv/pivoted_eda.csv', index=False)
+
+    final_df = pd.concat(all_dfs)
+    final_df.to_csv(f'./data/full_eda.csv', index=False)
+
+    no_files_df = pd.DataFrame(no_files_found, columns=['Symbol'])
+    no_files_df.to_csv('./data/no_files_found.csv', index=False)
+
+    unparsed_df = pd.DataFrame(unparsed_symbols, columns=['Symbol'])
+    unparsed_df.to_csv('./data/unparsed.csv', index=False)
 
 main() 
