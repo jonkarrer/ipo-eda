@@ -223,6 +223,13 @@ def generate_underwriter_dataframe(underwriters):
         rows.append(row)
     return pd.DataFrame(rows)
 
+def pivot_df(df):
+    current_cols = df.set_index('Element_Name')['Value']
+    result = pd.concat([current_cols]).to_frame().T
+    result = result.dropna(axis=1, how='any')
+
+    return result
+
 def main():
     file_path = './data/sec-ipo-files/AAC/d61603d424b4.htm'
     with open(file_path, 'r', encoding='utf-8') as file:
@@ -245,7 +252,8 @@ def main():
     underwriter_df = generate_underwriter_dataframe(underwriter_list)
 
     df = pd.concat([keyword_df, names_df, underwriter_df], ignore_index=True)
-    df.to_csv('./data/table-parser.csv', index=False)
+    pivoted_df = pivot_df(df)
+    pivoted_df.to_csv('./data/table-parser.csv', index=False)
 
 
 main()
