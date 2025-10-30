@@ -1,7 +1,8 @@
 import pandas as pd
 import re
 from bs4 import BeautifulSoup
-import nltk
+import os
+import plotly.express as px
 from nltk import ne_chunk, pos_tag, word_tokenize
 
 # nltk.download('punkt_tab')
@@ -10,6 +11,15 @@ from nltk import ne_chunk, pos_tag, word_tokenize
 # nltk.download('words')
 # nltk.download('averaged_perceptron_tagger_eng')
 # nltk.download('maxent_ne_chunker_tab')
+
+def try_to_get_file(dir_name, file_name):
+        file_path=f'./data/sec-ipo-files/{dir_name}/{file_name}'
+        does_exist = os.path.exists(file_path)
+
+        if does_exist:
+            return file_path
+        else:
+            return False
 
 def extract_person_names(soup):
     text = soup.get_text()
@@ -27,8 +37,7 @@ def extract_person_names(soup):
             if name in keyword_counts:
                 continue
             
-            check = cross_check(name)
-            if not check:
+            if not is_this_a_person(name):
                 continue
 
             pattern = r'\b' + re.escape(name) + r'\b'
@@ -37,7 +46,7 @@ def extract_person_names(soup):
    
     return list(keyword_counts.items())  
 
-def cross_check(name):
+def is_this_a_person(name):
     # Must be 2-3 words only
     name_parts = name.split()
     if len(name_parts) < 2 or len(name_parts) > 3:
@@ -60,27 +69,130 @@ def cross_check(name):
         'Dynamic', 'Robust', 'Sourcing', 'Scaled', 'Investing', 'Hardware',
         'Software', 'Supply', 'Stores', 'Center', 'Holdings', 'Brands',
         'Waste', 'Advisory', 'Royal', 'Purpose', 'Unless', 'Except', 'Due',
-        'Further', 'Highly', 'Known', 'Trends', 'Ability', 'Islands', 'Cayman'
+        'Further', 'Highly', 'Known', 'Trends', 'Ability', 'Islands', 'Cayman', 'High', 'Distinction',
+        'Life', 'Science', 'Health', 'Services', 'Systems', 'Solutions', 'Technologies', 'Global', 'International',
+        'Committee', 'Board', 'Directors', 'Report', 'Act', 'Rules', 'Legal',
+        'Market', 'Exchange', 'Class', 'Unit', 'Program', 'Factor', 'Factors',
+        'Risk', 'Risks', 'Income', 'Tax', 'Revenue', 'Business', 'Initial',
+        'Target', 'Portfolio', 'Vehicle', 'Presence', 'Knowledge', 'Support',
+        'Value', 'Shares', 'Impact', 'System', 'Current', 'Annual', 'Special',
+        'Energy', 'Power', 'Infrastructure', 'Opportunities', 'Strategic',
+        'Initiatives', 'Credit', 'Equity', 'Lending', 'Real', 'Estate',
+        'Commercial', 'Private', 'Public', 'Corporate', 'Direct', 'Mezzanine',
+        'Dynamic', 'Robust', 'Sourcing', 'Scaled', 'Investing', 'Hardware',
+        'Software', 'Supply', 'Stores', 'Center', 'Holdings', 'Brands',
+        'Waste', 'Advisory', 'Royal', 'Purpose', 'Unless', 'Except', 'Due',
+        'Further', 'Highly', 'Known', 'Trends', 'Ability', 'Islands', 'Cayman', 'High', 'Distinction',
+        'Life', 'Science', 'Health', 'Services', 'Systems', 'Solutions', 'Technologies', 'Global', 'International',
+        'Committee', 'Board', 'Directors', 'Report', 'Act', 'Rules', 'Legal',
+        'Market', 'Exchange', 'Class', 'Unit', 'Program', 'Factor', 'Factors',
+        'Employee', 'Employees', 'Director', 'Directors', 'Management', 'Managers',
+        'School', 'Periodic', 'Periodically', 'Reporting', 'Period', 'Periods',
+        'Netherlands', 'Australia', 'New', 'York', 'United', 'States', 'State', 'U.S.', 'U.S.A.', 'U.S.A', 'U.S', 'U.S.', 'U.S.A.', 'U.S.A', 'U.S',
+        'University', 'Liabilities', 'Liability', 'Civil', 'Civilian', 'Civilians', "Net", 'Loss', 'Loan', 'Explanatory', 'Paragraph'
+
+        # Business/Legal entities
+        'Enterprise', 'Enterprises', 'Industries', 'Organization', 'Organizations',
+        'Institution', 'Institutions', 'Foundation', 'Foundations', 'Agency', 'Agencies',
+        'Authority', 'Authorities', 'Department', 'Departments', 'Ministry', 'Bureau',
+        'Office', 'Division', 'Subsidiary', 'Subsidiaries', 'Affiliate', 'Affiliates',
+        'Partnership', 'Partnerships', 'Consortium', 'Alliance', 'Network', 'Networks',
+        'Platform', 'Platforms', 'Framework', 'Frameworks', 'Structure', 'Structures',
+    
+        # Financial/Investment terms
+        'Assets', 'Asset', 'Capital', 'Capitalization', 'Financing', 'Finance',
+        'Securities', 'Security', 'Bond', 'Bonds', 'Stock', 'Stocks', 'Options',
+        'Derivatives', 'Commodities', 'Currency', 'Currencies', 'Treasury',
+        'Reserve', 'Reserves', 'Liquidity', 'Volatility', 'Yield', 'Returns',
+        'Performance', 'Benchmark', 'Index', 'Indices', 'Rating', 'Ratings',
+        'Valuation', 'Pricing', 'Premium', 'Discount', 'Margin', 'Margins',
+    
+        # Business operations
+        'Operations', 'Operation', 'Process', 'Processes', 'Procedure', 'Procedures',
+        'Strategy', 'Strategies', 'Planning', 'Development', 'Implementation',
+        'Execution', 'Delivery', 'Production', 'Manufacturing', 'Distribution',
+        'Supply', 'Chain', 'Logistics', 'Procurement', 'Sourcing', 'Vendor',
+        'Vendors', 'Client', 'Clients', 'Customer', 'Customers', 'Consumer',
+        'Consumers', 'Market', 'Markets', 'Segment', 'Segments', 'Channel',
+        'Channels', 'Sales', 'Marketing', 'Advertising', 'Promotion', 'Brand',
+    
+        # Technology/Systems
+        'Technology', 'Technologies', 'Innovation', 'Innovations', 'Research',
+        'Development', 'Engineering', 'Design', 'Architecture', 'Infrastructure',
+        'Database', 'Databases', 'Application', 'Applications', 'Interface',
+        'Interfaces', 'Protocol', 'Protocols', 'Standard', 'Standards',
+        'Specification', 'Specifications', 'Configuration', 'Integration',
+        'Automation', 'Analytics', 'Data', 'Information', 'Intelligence',
+    
+        # Geographic/Location terms
+        'Region', 'Regions', 'Territory', 'Territories', 'Area', 'Areas',
+        'Zone', 'Zones', 'District', 'Districts', 'County', 'Counties',
+        'State', 'States', 'Province', 'Provinces', 'Country', 'Countries',
+        'Nation', 'Nations', 'City', 'Cities', 'Town', 'Towns', 'Village',
+        'Villages', 'Location', 'Locations', 'Site', 'Sites', 'Facility',
+        'Facilities', 'Campus', 'Building', 'Buildings', 'Complex',
+    
+        # Time/Temporal terms
+        'Period', 'Periods', 'Quarter', 'Quarters', 'Year', 'Years', 'Month',
+        'Months', 'Week', 'Weeks', 'Day', 'Days', 'Date', 'Dates', 'Time',
+        'Timeline', 'Schedule', 'Phase', 'Phases', 'Stage', 'Stages',
+        'Cycle', 'Cycles', 'Term', 'Terms', 'Duration', 'Interval', 'Intervals',
+    
+        # Abstract concepts
+        'Concept', 'Concepts', 'Principle', 'Principles', 'Theory', 'Theories',
+        'Model', 'Models', 'Method', 'Methods', 'Approach', 'Approaches',
+        'Technique', 'Techniques', 'Practice', 'Practices', 'Standard', 'Standards',
+        'Quality', 'Efficiency', 'Effectiveness', 'Productivity', 'Capacity',
+        'Capability', 'Capabilities', 'Competency', 'Competencies', 'Skill',
+        'Skills', 'Expertise', 'Experience', 'Knowledge', 'Understanding',
+    
+        # Measurement/Quantitative terms
+        'Metric', 'Metrics', 'Measure', 'Measures', 'Indicator', 'Indicators',
+        'Parameter', 'Parameters', 'Variable', 'Variables', 'Factor', 'Factors',
+        'Rate', 'Rates', 'Ratio', 'Ratios', 'Percentage', 'Percent', 'Amount',
+        'Amounts', 'Volume', 'Volumes', 'Size', 'Scale', 'Level', 'Levels',
+        'Degree', 'Degrees', 'Range', 'Ranges', 'Limit', 'Limits', 'Threshold',
+    
+        # Document/Communication terms
+        'Document', 'Documents', 'Report', 'Reports', 'Statement', 'Statements',
+        'Filing', 'Filings', 'Disclosure', 'Disclosures', 'Notice', 'Notices',
+        'Announcement', 'Announcements', 'Communication', 'Communications',
+        'Message', 'Messages', 'Letter', 'Letters', 'Memo', 'Memorandum',
+        'Agreement', 'Agreements', 'Contract', 'Contracts', 'Policy', 'Policies',
+    
+        # Status/Condition terms
+        'Status', 'Condition', 'Conditions', 'State', 'Situation', 'Situations',
+        'Position', 'Positions', 'Standing', 'Ranking', 'Classification',
+        'Category', 'Categories', 'Type', 'Types', 'Kind', 'Kinds', 'Form',
+        'Forms', 'Nature', 'Character', 'Characteristic', 'Characteristics',
+    
+        # Action/Process terms
+        'Action', 'Actions', 'Activity', 'Activities', 'Event', 'Events',
+        'Transaction', 'Transactions', 'Transfer', 'Transfers', 'Exchange',
+        'Exchanges', 'Trade', 'Trading', 'Purchase', 'Purchases', 'Sale',
+        'Sales', 'Acquisition', 'Acquisitions', 'Merger', 'Mergers',
+        'Consolidation', 'Restructuring', 'Reorganization', 'Transformation',
+    
+        # Common adjectives that appear as standalone terms
+        'General', 'Specific', 'Primary', 'Secondary', 'Main', 'Principal',
+        'Major', 'Minor', 'Senior', 'Junior', 'Executive', 'Administrative',
+        'Technical', 'Professional', 'Commercial', 'Industrial', 'Residential',
+        'Domestic', 'Foreign', 'Local', 'Regional', 'National', 'International',
+        'Global', 'Universal', 'Common', 'Standard', 'Basic', 'Advanced',
+        'Premium', 'Superior', 'Excellent', 'Outstanding', 'Exceptional',
+    
+        # Miscellaneous common non-person terms
+        'Item', 'Items', 'Object', 'Objects', 'Thing', 'Things', 'Matter',
+        'Issue', 'Issues', 'Problem', 'Problems', 'Solution', 'Solutions',
+        'Result', 'Results', 'Outcome', 'Outcomes', 'Effect', 'Effects',
+        'Impact', 'Impacts', 'Influence', 'Benefit', 'Benefits', 'Advantage',
+        'Advantages', 'Disadvantage', 'Disadvantages', 'Cost', 'Costs',
+        'Expense', 'Expenses', 'Fee', 'Fees', 'Charge', 'Charges', 'Price',
+        'Prices', 'Worth', 'Value', 'Values'
     }
     
     # Reject if any part is a non-person word
     if any(part in definite_non_person_words for part in name_parts):
-        return False
-    
-    # Reject single words that are clearly not names
-    single_word_rejects = {
-        'See', 'Unit', 'Risk', 'Ares', 'Power', 'Energy', 'Global', 'Smart',
-        'Floor', 'Board', 'Class', 'Rule', 'Legal', 'Due', 'Impact', 'System',
-        'Initial', 'Current', 'Annual', 'Market', 'Exchange', 'Director',
-        'Income', 'Shares', 'Business', 'Target', 'Limited', 'Special',
-        'Infrastructure', 'Strategic', 'Credit', 'Private', 'Corporate',
-        'Direct', 'Dynamic', 'Robust', 'Scaled', 'Known', 'Ability',
-        'Unless', 'Except', 'Further', 'Highly', 'Support', 'Principal',
-        'Adjustments', 'Rules', 'Includes', 'Risks', 'Directors', 'Nominees',
-        'Considerations', 'Trends', 'Oxley'
-    }
-    
-    if name in single_word_rejects:
         return False
     
     # Must start with capital letters (proper nouns)
@@ -122,7 +234,6 @@ key_patterns = [
 ]
 
 def extract_underwriters(soup, html_content):
-    """Extract underwriter information"""
     underwriters = []
     
     # Common underwriter patterns
@@ -162,7 +273,8 @@ def extract_underwriters(soup, html_content):
     
     return list(set(underwriters))
 
-def analyze_prospectus_keywords(text):
+def analyze_prospectus_keywords(soup):
+    text = soup.get_text().lower()
     target_keywords = [
         # Technology
         'technology', 'software', 'ai', 'machine learning',
@@ -204,6 +316,8 @@ def generate_keyword_dataframe(keywords_frequencies):
 def generate_names_dataframe(names):
     rows=[]
     for n in names:
+        if n[1] == 0:
+            continue
         row = {
             'Element_Name': n[0],
             'Value': n[1],
@@ -216,8 +330,8 @@ def generate_underwriter_dataframe(underwriters):
     rows=[]
     for u in underwriters:
         row = {
-            'Element_Name': 'Underwriter',
-            'Value': u,
+            'Element_Name': u,
+            'Value': 1,
             'Data_Type': 'underwriter'
         }
         rows.append(row)
@@ -230,30 +344,153 @@ def pivot_df(df):
 
     return result
 
-def main():
-    file_path = './data/sec-ipo-files/AAC/d61603d424b4.htm'
-    with open(file_path, 'r', encoding='utf-8') as file:
-        html_content= file.read()
+columns_to_remove=[
+    'Incorporated', 'LLP', 'Voting', 'Crime', 'Shareholder', 'Rights', 'Flows', 'CEO', 'Vehicle', 'CFO', 'COO', 'Worldwide', 'Party', 'Related', 'U.S.', 'Exclusive', 'Form', 'Forum', 'Nasdaq', 'NYSE', 'Listing', 'Only', 'Purchasers', 'Exempts', "Investors", 'Investor' 'Accounting',
+    'Bulletin', 'Applied', 'Limited', 'Molecular', 'Gigabit', 'Adjusted', 'EBITDA', 'Export', 'Control', 'Electronics', 'Engineers', 'Deferred', 'Nonqualified', 'Probability', 'Scenario', 'Google', 'Fiber', 'Gb', 'Ethernet', 'Beta', 'Gamma', 'Sigma',
+    'Automotive', 'Auto', 'Optical', 'Active', 'Texas', 'College', 'Participation', 'Plan', 'Incentive', 'Lease', 'Yard', 'Restaurant', 'Reason', 'Pacific', "Good", 'Great', 'Relationships', 'Certain', 'Electronic', 'Backup', 'Withholding', 'Investments', 'Joint', 'Trend',
+    'Motor', 'Boys', 'Mountain', 'Lookout', 'Mr.', 'Mrs.', 'Owner', 'Trademark', 'Parties', 'Consent', 'Written', 'Sponsorship', 'Sponsorships', 'Retail', 'Properties', 'Average', 'Attorney', 'Attorneys', 'Horizons', 'Surgery', 'Plastic', "Steak", 'Downtown', 'Trolley', 'Shopping',
+    'Salary', 'Base', "Award", 'Awards', 'Liquidations', 'Distributions', 'Penalty', 'Bids', "Balance", 'Sheets', 'Note', 'Landmark', 'Hotel', 'Hotels', 'Admin', 'Administration', 'Drug', 'Option', 'Share', "Sphere", 'Adaptive', 'Biotechnologies', 'Biologics', 'Biology', 'Harbour', 'No',
+    'Patent', 'Release', 'Pay', 'Payment', 'Payments', 'Royalty', 'Biotech', 'Genome', 'Brain', 'Search', 'Deep', 'Antibodies', 'Responses', 'Find', 'Natural', 'View', 'Detailed', 'Cell', 'Cells', 'Human', 'Immune', 'License', 'Emergency', 'Therapeutics', 'Pharma', 'Pharmaceuticals', 'Cancer',
+    'Series', 'Financial', 'Instruments', 'Improvements', 'Features', 'Part', 'Liquidation', 'Preference', 'Preferences', 'Officer', 'Scientific', 'Science', 'Industry', 'Opportunities', 'Drugs', 'Quant', 'Quanta', 'Compute', 'Computing', 'Computer', 'Parkway', 'Stockholder', 'Proposals', 'Proposal',
+    'Embassy', 'Accounts', 'Receivable', 'Cash', 'Tourism', 'Commission', 'Republic', 'Banana', 'Barn', 'Pottery', 'Store', 'Home', 'Express', 'Juice', 'Dress', 'Square', 'Feet', 'Crab', 'Tea', 'Salsa', 'Fresh', 'Refining', 'Refinery', 'Taco', 'Outlet', 'Grocery', 'Old', 'PCS', 'Sprint',
+    'Experience', 'Experiences', 'Showed', 'Street', 'Beach', 'Airbnb', 'Nationals', 'Specially', 'Designated', 'Tourism', 'Council', 'Hurricane', 'Open', 'Booked', 'Night', 'Stays', 'Cash', 'Free', 'Flow', 'Retained', 'Inventory', 'Resale', 'Restriction', 'Restrictions', 'Santa', 'Biosciences',
+    'Geographic', 'Discover', 'Retain', 'Guests', 'Web', 'Amazon', 'Project', 'Regulatory', 'Fine', 'Arts', 'Ms', 'Ms.', 'Ask', 'Founder', 'Compensation', 'Institutional', 'Tax', 'Taxes', 'Lodge', 'Lodging', 'Readily', 'Healthcare', 'Program', 'Review', 'Programs', 'Disease', 'Neuroimaging', 'Initiative', 'Initiatives',
+    'Neuro', 'Biotherapeutics', 'Critical', 'Accounting', 'Economic', 'Video', 'Offering', 'Investor', 'Relations', 'Warrant', 'Agent', 'Clinical', 'Trial', 'INC.', 'Professor', 'Gross', 'Profit', 'Fully', 'Paid', 'Therapy', 'Breakthrough', 'Medicinal', 'Products', 'Education', 'Affordability', 'Book',
+    'Place', 'IRA', 'Online', 'Privacy', 'Accountants', 'Prospectus', 'Demand', 'Registration', 'Laws', 'Canaccord', 'Limitation', 'Exercise', 'Stamp', 'Debt', 'Insurance', 'Independence', 'Foods', 'Labs', 'Lab', 'Laboratories', 'Budget'
+]
+
+def analyze_csvs():
+    all_dfs = []
     
-    soup = BeautifulSoup(html_content, 'html.parser')
-    
-    # Remove script and style elements
-    for script in soup(["script", "style"]):
-        script.decompose()
+    df = pd.read_csv('./data/ipo_day_summary.csv')
+    df = df[['symbol', 'url']]
+    df['url'] = df['url'].apply(lambda x: x.split('/')[-1])
+    df = df.drop_duplicates(subset=['symbol'])
+
+    i = 0 
+    for tuple in list(df.itertuples(index=False)):
+        # Get file coordinates
+        dir_name=tuple[0]
+        file_name="word_analysis_2.csv"
+        file_path = try_to_get_file(dir_name, file_name) 
+        
+        # File may not exist
+        if file_path == False:
+            continue
+        
+        df = pd.read_csv(file_path)
+        df['symbol'] = dir_name
+        df = df[[col for col in df.columns 
+                   if not any(word in col for word in columns_to_remove)]]
+        df.to_csv(f'./data/sec-ipo-files/{dir_name}/word_analysis_3.csv', index=False)
+        all_dfs.append(df)
+        i += 1
+        if i == 200:
+            break
+
+    print("Concatting") 
+    c = pd.concat(all_dfs)
+    c = c.loc[:, c.count() > 1]
+    c.loc['Total'] = c.count()
+    c.to_csv('./data/a-o-data.csv', index=False)
    
-    text_content = soup.get_text().lower()
+    # Create histogram
+    counts = c.count()
+    exclude_cols = [
+        # Technology
+        'technology', 'software', 'ai', 'machine learning',
+        'cloud', 'saas', 'platform', 'digital', 'data', 'analytics', 'algorithm',
+        'automation', 'blockchain', 'cryptocurrency', 'cybersecurity',
+        'subscription', 'recurring','e-commerce', 'mobile', 'app', 'virtual',
+        
+        # Industry specific
+        'healthcare', 'biotech', 'pharmaceutical', 'medical', 'clinical',
+        'energy', 'renewable', 'solar', 'electric', 'battery',
+        'real estate', 'logistics', 'transportation', 'automotive',
 
-    keyword_list = analyze_prospectus_keywords(text_content)
-    names_list = extract_person_names(soup)
-    underwriter_list = extract_underwriters(soup, html_content)
+        # Other
+        'Volume', 'Day', 'IPO Date', 'Open', 'Close', 'Diff', 'Public Price Per Share', 'Price Public Total', 'IPO_Date', 'UBS', 'Ubs', 'Price_Public_Total', 'symbol'
+    ]
+    filter_counts = counts.drop(exclude_cols, errors='ignore')
 
-    keyword_df = generate_keyword_dataframe(keyword_list)
-    names_df = generate_names_dataframe(names_list)
-    underwriter_df = generate_underwriter_dataframe(underwriter_list)
+    # Get top 50
+    top_50 = filter_counts.nlargest(100)
 
-    df = pd.concat([keyword_df, names_df, underwriter_df], ignore_index=True)
-    pivoted_df = pivot_df(df)
-    pivoted_df.to_csv('./data/table-parser.csv', index=False)
+    # Create bar chart
+    fig = px.bar(
+        x=top_50.index,
+        y=top_50.values,
+        title="Top 50 Columns by Non-Null Count",
+        labels={'x': 'Column Name', 'y': 'Non-Null Count'}
+    )
+
+    # Rotate x-axis labels for readability
+    fig.update_layout(xaxis_tickangle=-45)
+    fig.show()
 
 
-main()
+
+
+def main():
+    all_dfs = []
+    
+    df = pd.read_csv('./data/ipo_day_summary.csv')
+    df = df[['symbol', 'url', 'volume', 'day', 'ipo_date', 'open', 'close', 'diff', 'public_price_per_share', 'price_public_total']]
+    df['url'] = df['url'].apply(lambda x: x.split('/')[-1])
+    
+    for tuple in list(df.itertuples(index=False)):
+        # Get file coordinates
+        dir_name=tuple[0]
+        file_name=tuple[1]
+        volume=tuple[2]
+        day=tuple[3]
+        ipo_date=tuple[4]
+        open_price=tuple[5]
+        close=tuple[6]
+        diff=tuple[7]
+        public_price_per_share=tuple[8]
+        price_public_total=tuple[9]
+
+        # Fetch the file for parsing
+        file_path = try_to_get_file(dir_name, file_name) 
+
+        # File may not exist
+        if file_path == False:
+            continue
+
+        with open(file_path, 'r', encoding='utf-8') as file:
+            html_content= file.read()
+
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Remove script and style elements
+        for script in soup(["script", "style"]):
+            script.decompose()
+
+        keyword_list = analyze_prospectus_keywords(soup)
+        names_list = extract_person_names(soup)
+        underwriter_list = extract_underwriters(soup, html_content)
+
+        keyword_df = generate_keyword_dataframe(keyword_list)
+        names_df = generate_names_dataframe(names_list)
+        underwriter_df = generate_underwriter_dataframe(underwriter_list)
+
+        df = pd.concat([keyword_df, names_df, underwriter_df], ignore_index=True)
+        pivoted_df = pivot_df(df)
+        pivoted_df['Volume'] = volume
+        pivoted_df['Day'] = day
+        pivoted_df['IPO_Date'] = ipo_date
+        pivoted_df['Open'] = open_price
+        pivoted_df['Close'] = close
+        pivoted_df['Diff'] = diff
+        pivoted_df['Public_Price_Per_Share'] = public_price_per_share
+        pivoted_df['Price_Public_Total'] = price_public_total
+        pivoted_df.to_csv(f'./data/sec-ipo-files/{dir_name}/word_analysis_2.csv', index=False)
+        all_dfs.append(pivoted_df)
+
+
+    final_df = pd.concat(all_dfs)
+    final_df.to_csv(f'./data/full_eda.csv', index=False)
+
+# main()
+analyze_csvs()
