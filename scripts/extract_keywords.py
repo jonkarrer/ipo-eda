@@ -2,7 +2,6 @@ import pandas as pd
 import re
 from bs4 import BeautifulSoup
 import os
-import plotly.express as px
 from nltk import ne_chunk, pos_tag, word_tokenize
 
 # nltk.download('punkt_tab')
@@ -344,91 +343,6 @@ def pivot_df(df):
 
     return result
 
-columns_to_remove=[
-    'Incorporated', 'LLP', 'Voting', 'Crime', 'Shareholder', 'Rights', 'Flows', 'CEO', 'Vehicle', 'CFO', 'COO', 'Worldwide', 'Party', 'Related', 'U.S.', 'Exclusive', 'Form', 'Forum', 'Nasdaq', 'NYSE', 'Listing', 'Only', 'Purchasers', 'Exempts', "Investors", 'Investor' 'Accounting',
-    'Bulletin', 'Applied', 'Limited', 'Molecular', 'Gigabit', 'Adjusted', 'EBITDA', 'Export', 'Control', 'Electronics', 'Engineers', 'Deferred', 'Nonqualified', 'Probability', 'Scenario', 'Google', 'Fiber', 'Gb', 'Ethernet', 'Beta', 'Gamma', 'Sigma',
-    'Automotive', 'Auto', 'Optical', 'Active', 'Texas', 'College', 'Participation', 'Plan', 'Incentive', 'Lease', 'Yard', 'Restaurant', 'Reason', 'Pacific', "Good", 'Great', 'Relationships', 'Certain', 'Electronic', 'Backup', 'Withholding', 'Investments', 'Joint', 'Trend',
-    'Motor', 'Boys', 'Mountain', 'Lookout', 'Mr.', 'Mrs.', 'Owner', 'Trademark', 'Parties', 'Consent', 'Written', 'Sponsorship', 'Sponsorships', 'Retail', 'Properties', 'Average', 'Attorney', 'Attorneys', 'Horizons', 'Surgery', 'Plastic', "Steak", 'Downtown', 'Trolley', 'Shopping',
-    'Salary', 'Base', "Award", 'Awards', 'Liquidations', 'Distributions', 'Penalty', 'Bids', "Balance", 'Sheets', 'Note', 'Landmark', 'Hotel', 'Hotels', 'Admin', 'Administration', 'Drug', 'Option', 'Share', "Sphere", 'Adaptive', 'Biotechnologies', 'Biologics', 'Biology', 'Harbour', 'No',
-    'Patent', 'Release', 'Pay', 'Payment', 'Payments', 'Royalty', 'Biotech', 'Genome', 'Brain', 'Search', 'Deep', 'Antibodies', 'Responses', 'Find', 'Natural', 'View', 'Detailed', 'Cell', 'Cells', 'Human', 'Immune', 'License', 'Emergency', 'Therapeutics', 'Pharma', 'Pharmaceuticals', 'Cancer',
-    'Series', 'Financial', 'Instruments', 'Improvements', 'Features', 'Part', 'Liquidation', 'Preference', 'Preferences', 'Officer', 'Scientific', 'Science', 'Industry', 'Opportunities', 'Drugs', 'Quant', 'Quanta', 'Compute', 'Computing', 'Computer', 'Parkway', 'Stockholder', 'Proposals', 'Proposal',
-    'Embassy', 'Accounts', 'Receivable', 'Cash', 'Tourism', 'Commission', 'Republic', 'Banana', 'Barn', 'Pottery', 'Store', 'Home', 'Express', 'Juice', 'Dress', 'Square', 'Feet', 'Crab', 'Tea', 'Salsa', 'Fresh', 'Refining', 'Refinery', 'Taco', 'Outlet', 'Grocery', 'Old', 'PCS', 'Sprint',
-    'Experience', 'Experiences', 'Showed', 'Street', 'Beach', 'Airbnb', 'Nationals', 'Specially', 'Designated', 'Tourism', 'Council', 'Hurricane', 'Open', 'Booked', 'Night', 'Stays', 'Cash', 'Free', 'Flow', 'Retained', 'Inventory', 'Resale', 'Restriction', 'Restrictions', 'Santa', 'Biosciences',
-    'Geographic', 'Discover', 'Retain', 'Guests', 'Web', 'Amazon', 'Project', 'Regulatory', 'Fine', 'Arts', 'Ms', 'Ms.', 'Ask', 'Founder', 'Compensation', 'Institutional', 'Tax', 'Taxes', 'Lodge', 'Lodging', 'Readily', 'Healthcare', 'Program', 'Review', 'Programs', 'Disease', 'Neuroimaging', 'Initiative', 'Initiatives',
-    'Neuro', 'Biotherapeutics', 'Critical', 'Accounting', 'Economic', 'Video', 'Offering', 'Investor', 'Relations', 'Warrant', 'Agent', 'Clinical', 'Trial', 'INC.', 'Professor', 'Gross', 'Profit', 'Fully', 'Paid', 'Therapy', 'Breakthrough', 'Medicinal', 'Products', 'Education', 'Affordability', 'Book',
-    'Place', 'IRA', 'Online', 'Privacy', 'Accountants', 'Prospectus', 'Demand', 'Registration', 'Laws', 'Canaccord', 'Limitation', 'Exercise', 'Stamp', 'Debt', 'Insurance', 'Independence', 'Foods', 'Labs', 'Lab', 'Laboratories', 'Budget'
-]
-
-def analyze_csvs():
-    all_dfs = []
-    
-    df = pd.read_csv('./data/ipo_day_summary.csv')
-    df = df[['symbol', 'url']]
-    df['url'] = df['url'].apply(lambda x: x.split('/')[-1])
-    df = df.drop_duplicates(subset=['symbol'])
-
-    i = 0 
-    for tuple in list(df.itertuples(index=False)):
-        # Get file coordinates
-        dir_name=tuple[0]
-        file_name="word_analysis_2.csv"
-        file_path = try_to_get_file(dir_name, file_name) 
-        
-        # File may not exist
-        if file_path == False:
-            continue
-        
-        df = pd.read_csv(file_path)
-        df['symbol'] = dir_name
-        df = df[[col for col in df.columns 
-                   if not any(word in col for word in columns_to_remove)]]
-        df.to_csv(f'./data/sec-ipo-files/{dir_name}/word_analysis_3.csv', index=False)
-        all_dfs.append(df)
-        i += 1
-        if i == 200:
-            break
-
-    print("Concatting") 
-    c = pd.concat(all_dfs)
-    c = c.loc[:, c.count() > 1]
-    c.loc['Total'] = c.count()
-    c.to_csv('./data/a-o-data.csv', index=False)
-   
-    # Create histogram
-    counts = c.count()
-    exclude_cols = [
-        # Technology
-        'technology', 'software', 'ai', 'machine learning',
-        'cloud', 'saas', 'platform', 'digital', 'data', 'analytics', 'algorithm',
-        'automation', 'blockchain', 'cryptocurrency', 'cybersecurity',
-        'subscription', 'recurring','e-commerce', 'mobile', 'app', 'virtual',
-        
-        # Industry specific
-        'healthcare', 'biotech', 'pharmaceutical', 'medical', 'clinical',
-        'energy', 'renewable', 'solar', 'electric', 'battery',
-        'real estate', 'logistics', 'transportation', 'automotive',
-
-        # Other
-        'Volume', 'Day', 'IPO Date', 'Open', 'Close', 'Diff', 'Public Price Per Share', 'Price Public Total', 'IPO_Date', 'UBS', 'Ubs', 'Price_Public_Total', 'symbol'
-    ]
-    filter_counts = counts.drop(exclude_cols, errors='ignore')
-
-    # Get top 50
-    top_50 = filter_counts.nlargest(100)
-
-    # Create bar chart
-    fig = px.bar(
-        x=top_50.index,
-        y=top_50.values,
-        title="Top 50 Columns by Non-Null Count",
-        labels={'x': 'Column Name', 'y': 'Non-Null Count'}
-    )
-
-    # Rotate x-axis labels for readability
-    fig.update_layout(xaxis_tickangle=-45)
-    fig.show()
-
-
 
 
 def main():
@@ -485,6 +399,7 @@ def main():
         pivoted_df['Diff'] = diff
         pivoted_df['Public_Price_Per_Share'] = public_price_per_share
         pivoted_df['Price_Public_Total'] = price_public_total
+        pivoted_df['symbol'] = dir_name
         pivoted_df.to_csv(f'./data/sec-ipo-files/{dir_name}/word_analysis_2.csv', index=False)
         all_dfs.append(pivoted_df)
 
@@ -492,5 +407,4 @@ def main():
     final_df = pd.concat(all_dfs)
     final_df.to_csv(f'./data/full_eda.csv', index=False)
 
-# main()
-analyze_csvs()
+main()

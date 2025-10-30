@@ -1,188 +1,30 @@
-import os
-import re
+import plotly.express as px
 import pandas as pd
-from secxbrl import parse_inline_xbrl
-from bs4 import BeautifulSoup
+import os
 
-def process_xbrl_file(file_path):
-    with open(file_path) as f:
-        content = f.read() 
+columns_to_remove=[
+    'Incorporated', 'LLP', 'Voting', 'Crime', 'Shareholder', 'Rights', 'Flows', 'CEO', 'Vehicle', 'CFO', 'COO', 'Worldwide', 'Party', 'Related', 'U.S.', 'Exclusive', 'Form', 'Forum', 'Nasdaq', 'NYSE', 'Listing', 'Only', 'Purchasers', 'Exempts', "Investors", 'Investor' 'Accounting',
+    'Bulletin', 'Applied', 'Limited', 'Molecular', 'Gigabit', 'Adjusted', 'EBITDA', 'Export', 'Control', 'Electronics', 'Engineers', 'Deferred', 'Nonqualified', 'Probability', 'Scenario', 'Google', 'Fiber', 'Gb', 'Ethernet', 'Beta', 'Gamma', 'Sigma',
+    'Automotive', 'Auto', 'Optical', 'Active', 'Texas', 'College', 'Participation', 'Plan', 'Incentive', 'Lease', 'Yard', 'Restaurant', 'Reason', 'Pacific', "Good", 'Great', 'Relationships', 'Certain', 'Electronic', 'Backup', 'Withholding', 'Investments', 'Joint', 'Trend',
+    'Motor', 'Boys', 'Mountain', 'Lookout', 'Mr.', 'Mrs.', 'Owner', 'Trademark', 'Parties', 'Consent', 'Written', 'Sponsorship', 'Sponsorships', 'Retail', 'Properties', 'Average', 'Attorney', 'Attorneys', 'Horizons', 'Surgery', 'Plastic', "Steak", 'Downtown', 'Trolley', 'Shopping',
+    'Salary', 'Base', "Award", 'Awards', 'Liquidations', 'Distributions', 'Penalty', 'Bids', "Balance", 'Sheets', 'Note', 'Landmark', 'Hotel', 'Hotels', 'Admin', 'Administration', 'Drug', 'Option', 'Share', "Sphere", 'Adaptive', 'Biotechnologies', 'Biologics', 'Biology', 'Harbour', 'No',
+    'Patent', 'Release', 'Pay', 'Payment', 'Payments', 'Royalty', 'Biotech', 'Genome', 'Brain', 'Search', 'Deep', 'Antibodies', 'Responses', 'Find', 'Natural', 'View', 'Detailed', 'Cell', 'Cells', 'Human', 'Immune', 'License', 'Emergency', 'Therapeutics', 'Pharma', 'Pharmaceuticals', 'Cancer',
+    'Series', 'Financial', 'Instruments', 'Improvements', 'Features', 'Part', 'Liquidation', 'Preference', 'Preferences', 'Officer', 'Scientific', 'Science', 'Industry', 'Opportunities', 'Drugs', 'Quant', 'Quanta', 'Compute', 'Computing', 'Computer', 'Parkway', 'Stockholder', 'Proposals', 'Proposal',
+    'Embassy', 'Accounts', 'Receivable', 'Cash', 'Tourism', 'Commission', 'Republic', 'Banana', 'Barn', 'Pottery', 'Store', 'Home', 'Express', 'Juice', 'Dress', 'Square', 'Feet', 'Crab', 'Tea', 'Salsa', 'Fresh', 'Refining', 'Refinery', 'Taco', 'Outlet', 'Grocery', 'Old', 'PCS', 'Sprint',
+    'Experience', 'Experiences', 'Showed', 'Street', 'Beach', 'Airbnb', 'Nationals', 'Specially', 'Designated', 'Tourism', 'Council', 'Hurricane', 'Open', 'Booked', 'Night', 'Stays', 'Cash', 'Free', 'Flow', 'Retained', 'Inventory', 'Resale', 'Restriction', 'Restrictions', 'Santa', 'Biosciences',
+    'Geographic', 'Discover', 'Retain', 'Guests', 'Web', 'Amazon', 'Project', 'Regulatory', 'Fine', 'Arts', 'Ms', 'Ms.', 'Ask', 'Founder', 'Compensation', 'Institutional', 'Tax', 'Taxes', 'Lodge', 'Lodging', 'Readily', 'Healthcare', 'Program', 'Review', 'Programs', 'Disease', 'Neuroimaging', 'Initiative', 'Initiatives',
+    'Neuro', 'Biotherapeutics', 'Critical', 'Accounting', 'Economic', 'Video', 'Offering', 'Investor', 'Relations', 'Warrant', 'Agent', 'Clinical', 'Trial', 'INC.', 'Professor', 'Gross', 'Profit', 'Fully', 'Paid', 'Therapy', 'Breakthrough', 'Medicinal', 'Products', 'Education', 'Affordability', 'Book',
+    'Place', 'IRA', 'Online', 'Privacy', 'Accountants', 'Prospectus', 'Demand', 'Registration', 'Laws', 'Canaccord', 'Limitation', 'Exercise', 'Stamp', 'Debt', 'Insurance', 'Independence', 'Foods', 'Labs', 'Lab', 'Laboratories', 'Budget', 'Brokers', 'Tiger', 'Genetics', 'Law', 'Future', 'Issuance',
+    'Academy', 'Naval', 'Navy', 'Qualified', 'IPO', 'Error', 'Correction', 'Correct', 'Moelis', 'Drive', 'Military', 'Boca', 'Eastern', 'Marine', 'Corps', 'Institute', 'Rule', 'Conduct', 'Provisions', 'Final', 'KGaA', 'Entertainment', 'Works', 'Body', 'Deficit Reduction', 'Menlo Park', 'Palo Alto',
+    'Las Vegas', 'San Francisco', 'Puerto Rico', 'Product Approval', 'Lexington', 'Avenue', 'Climate Change', 'Saudi Arabia', 'Blank Check', 'Monte Carlo', 'Reverse Split' 
+]
 
-    return parse_inline_xbrl(content)
-
-def filter_xbrl_df(df):
-    # Define key patterns to match
-    key_patterns = [
-        'Revenue', 'CostOfGoods', 'CostOfRevenue', 'GrossProfit', 
-        'OperatingIncome', 'NetIncome', 'EarningsPerShare',
-        'Assets', 'Cash', 'AccountsReceivable', 'Inventory',
-        'Liabilities', 'StockholdersEquity', 'RetainedEarnings',
-        'NetCashProvidedByUsedInOperating', 'NetCashProvidedByUsedInInvesting', 
-        'NetCashProvidedByUsedInFinancing',
-        'WeightedAverageNumberOfShares', 'SharesOutstanding',
-        'DepreciationAndAmortization', 'ShareBasedCompensation',
-        'InterestExpense', 'IncomeTaxExpense'
-    ]
-
-    df = df[df['Is_Null'] == 'false'] # Drop rows with null = true
-    df = df[df['Taxonomy_Prefix'] == 'us-gaap'] # Only want us-gaap data
-    df['Value'] = pd.to_numeric(df['Value'].str.replace(',', ''), errors='coerce') # Convert to number, otherwise drop string info
-    df = df.dropna(subset=['Value']) # Drop nulls
-    df = df.drop_duplicates()
-    df['Element_Name'] = df['Element_Name'].str.replace("us-gaap:", '') # Remove us-gaap prefix
-
-    # Create a pattern-based filter
-    pattern = '|'.join(key_patterns)
-    df_filtered = df[df['Element_Local_Name'].str.contains(pattern, case=False, na=False)].copy()
-    df_deduped = df_filtered.drop_duplicates(
-        subset=['Element_Local_Name', 'Period_Start', 'Period_End', 'Instant_Date', 'Entity_ID'],
-        keep='first'
-    )
-    return df_deduped
-    
-
-def analyze_prospectus_keywords(file_path):
-    # Load HTML
-    with open(file_path, 'r', encoding='utf-8') as f:
-        html_content = f.read()
-    
-    # Parse HTML
-    soup = BeautifulSoup(html_content, 'html.parser')
-    
-    # Remove script and style elements
-    for script in soup(["script", "style"]):
-        script.decompose()
-    
-    text = soup.get_text().lower()
-    
-    target_keywords = [
-        # Technology
-        'technology', 'software', 'ai', 'machine learning',
-        'cloud', 'saas', 'platform', 'digital', 'data', 'analytics', 'algorithm',
-        'automation', 'blockchain', 'cryptocurrency', 'cybersecurity',
-        'subscription', 'recurring','e-commerce', 'mobile', 'app', 'virtual',
-        
-        # Industry specific
-        'healthcare', 'biotech', 'pharmaceutical', 'medical', 'clinical',
-        'energy', 'renewable', 'solar', 'electric', 'battery',
-        'real estate', 'logistics', 'transportation', 'automotive',
-    ]
-    
-    # Count keyword frequencies
-    keyword_counts = {}
-    
-    for kw in target_keywords:
-        # Use word boundaries for exact matches, case insensitive
-        pattern = r'\b' + re.escape(kw.lower()) + r'\b'
-        matches = re.findall(pattern, text)
-        keyword_counts[kw] = len(matches)
-    
-    return list(keyword_counts.items())
-
-def generate_xbrl_dataframe(parsed_xbrl_items):
-    # Extract desired attributes from xbrl
-    rows = []
-    for item in parsed_xbrl_items:
-        element_name = item['_attributes'].get('name', '')
-        period_end = item['_context'].get('context_period_enddate', '')
-        instant_date = item['_context'].get('context_period_instant', '')
-        
-        # Use period_end if available, otherwise instant_date, otherwise no date
-        date_part = period_end or instant_date or ''
-        
-        # Create combined element name with date
-        if date_part:
-            combined_element_name = f"{element_name}_{date_part}"
-        else:
-            combined_element_name = element_name
-
-        row = {
-            'Fact_ID': item['_attributes'].get('id', ''),
-            'Element_Name': item['_attributes'].get('name', ''),
-            'Value': item.get('_val', ''),
-            'Unit': item['_attributes'].get('unitref', ''),
-            'Is_Null': item['_attributes'].get('xs:nil', 'false'),
-            'Context_Ref': item['_context'].get('_contextref', ''),
-            'Entity_ID': item['_context'].get('context_entity_identifier', ''),
-            'Period_Start': item['_context'].get('context_period_startdate', ''),
-            'Period_End': item['_context'].get('context_period_enddate', ''),
-            'Instant_Date': item['_context'].get('context_period_instant', ''),
-            'Taxonomy_Prefix': item['_attributes'].get('name', '').split(':')[0] if ':' in item['_attributes'].get('name', '') else '',
-            'Element_Local_Name': item['_attributes'].get('name', '').split(':')[-1] if ':' in item['_attributes'].get('name', '') else item['_attributes'].get('name', ''),
-            'Combined_Element_Name': combined_element_name,
-            'Date_Part': date_part,
-            'Data_Type': 'xbrl'
-        }
-        rows.append(row)
-        
-    df = pd.DataFrame(rows)
-    return filter_xbrl_df(df)
-
-
-def generate_keyword_dataframe(keywords_frequencies):
-    # Add word list extraction to rows
-    rows = []
-    for word_and_frequency in keywords_frequencies:
-        row = {
-            'Fact_ID': '0000',
-            'Element_Name': word_and_frequency[0],
-            'Value': word_and_frequency[1],
-            'Unit': 'count',
-            'Is_Null': 'false',
-            'Context_Ref': 'frequency',
-            'Entity_ID': '0000',
-            'Period_Start': '',
-            'Period_End': '',
-            'Instant_Date': '',
-            'Taxonomy_Prefix': 'custom',
-            'Element_Local_Name': 'keyword_frequency',
-            'Combined_Element_Name': '',
-            'Date_Part': '',
-            'Data_Type': 'keyword'
-        }
-        rows.append(row)
-       
-    return pd.DataFrame(rows)
-
-def convert_dates_to_datetimes(combined_df):
-    combined_df['Period_Start'] = pd.to_datetime(combined_df['Period_Start'])
-    combined_df['Period_End'] = pd.to_datetime(combined_df['Period_End'])
-    combined_df['Instant_Date'] = pd.to_datetime(combined_df['Instant_Date'])
-    return combined_df
-
-def create_trend_column(df, element_name):
-    column = 'Value'
-    
-    # Create trend column
-    df_sorted = df.sort_values('Instant_Date', ascending=True)
-    df_sorted['Trend'] = df_sorted.groupby('Element_Name')[column].transform(lambda x: x.iloc[-1] - x.iloc[0])
-    
-    return df_sorted
-
-def filter_for_latest_date(df):
-    df_filtered = (df.sort_values('Instant_Date')
-                    .groupby('Element_Name', as_index=False)
-                    .last())
-    return df_filtered
-
-def remove_non_instant_dates(df):
-    df_filtered = df[df['Instant_Date'].notna()]
-    return df_filtered
-
-def filter_out_columns(df):
-    df_filtered = df[['Element_Name', 'Value', 'Unit', 'Trend', 'Instant_Date', 'Data_Type']]
-    return df_filtered
-
-def pivot_df(df):
-    current_cols = df.set_index('Element_Name')['Value'].add_suffix('_Current')
-    trend_cols = df.set_index('Element_Name')['Trend'].add_suffix('_Trend')
-    result = pd.concat([current_cols, trend_cols]).to_frame().T
-
-    result['Instant_Date'] = df['Instant_Date'].iloc[0]
-    result['Data_Type'] = df['Data_Type'].iloc[0]
-    result = result.dropna(axis=1, how='any')
-
-    return result
+# low_count_col_df = pd.read_csv('./data/low_count_columns.csv')
+# new_low_df = pd.read_csv('./data/low_count_columns_2000-2500.csv')
+# combined_df = pd.concat([low_count_col_df, new_low_df], ignore_index=True)
+# combined_df = combined_df.groupby(['column_name'])['count'].sum().reset_index()
+# combined_df.to_csv('./data/low_count_columns_new.csv', index=False)
+# columns_to_remove = combined_df['column_name'].tolist() + columns_to_remove
 
 def try_to_get_file(dir_name, file_name):
         file_path=f'./data/sec-ipo-files/{dir_name}/{file_name}'
@@ -193,56 +35,216 @@ def try_to_get_file(dir_name, file_name):
         else:
             return False
 
-def main():
+def build_dataset():
     all_dfs = []
-    no_files_found = []
-    unparsed_symbols = []
-
-    df = pd.read_csv('./data/ipo_day_summary.csv')
-    df = df[['symbol', 'url']]
-    df['url'] = df['url'].apply(lambda x: x.split('/')[-1])
     
+    df = pd.read_csv('./data/ipo_day_summary.csv')
+    df = df[['symbol', 'url', 'public_price_per_share']]
+    df['url'] = df['url'].apply(lambda x: x.split('/')[-1])
+    df = df.drop_duplicates(subset=['symbol'])
+
+    i=0
     for tuple in list(df.itertuples(index=False)):
-        # Get file coordinates
+        i+=1
+        if i < 2000:
+            continue
         dir_name=tuple[0]
         file_name=tuple[1]
+        public_price_per_share=tuple[2]
+        # volume=tuple[2]
+        # day=tuple[3]
+        # ipo_date=tuple[4]
+        # open_price=tuple[5]
+        # close=tuple[6]
+        # diff=tuple[7]
+        # public_price_per_share=tuple[8]
+        # price_public_total=tuple[9]
 
-        # Fetch the file for parsing
+        # Get file coordinates
+        file_name="word_analysis_2.csv"
         file_path = try_to_get_file(dir_name, file_name) 
-
+        
         # File may not exist
         if file_path == False:
-            no_files_found.append(dir_name)
+            print(f"File {file_name} does not exist for {dir_name}")
             continue
+        
+        ipo_df = pd.read_csv(file_path)
+        ipo_df = ipo_df[[col for col in ipo_df.columns 
+                   if not any(word in col for word in columns_to_remove)]]
+        ipo_df['Symbol'] = dir_name
+        ipo_df['Public_Price_Per_Share'] = public_price_per_share
+        
+        ipo_df.to_csv(f'./data/sec-ipo-files/{dir_name}/word_analysis_3.csv', index=False)
+        all_dfs.append(ipo_df)
+        
+        if i > 2500:
+            break
 
-        # Parsing may fail
-        parsed_xbrl_file = process_xbrl_file(file_path)
-        if len(parsed_xbrl_file) == 0:
-            unparsed_symbols.append(dir_name)
-            continue
-      
-        keyword_frequencies = analyze_prospectus_keywords(file_path)
-        xbrl_df = generate_xbrl_dataframe(parsed_xbrl_file)
-        keyword_df = generate_keyword_dataframe(keyword_frequencies)
+    print("Concatting") 
+    c = pd.concat(all_dfs)
+    export_low_count_columns(c)
+    c.loc['Total'] = c.count()
+    c.to_csv('./data/eda_dataset_temp.csv', index=False)
 
-        df = convert_dates_to_datetimes(xbrl_df)
-        trend_df = create_trend_column(df, 'Cash')
-        latest_df = filter_for_latest_date(trend_df)
-        only_instant_df = remove_non_instant_dates(latest_df)
-        concat_df = pd.concat([only_instant_df, keyword_df])
-        final_df = filter_out_columns(concat_df)
-        pivoted_df = pivot_df(final_df)
-        pivoted_df.to_csv(f'./data/sec-ipo-files/{dir_name}/pivot_table.csv')
-        all_dfs.append(pivoted_df)
+def export_low_count_columns(df, max_count=10):
+    # Get the total counts from the last row
+    df.loc['Total'] = df.count()
+    total_counts = df.iloc[-1]
+    
+    # Find columns with count <= max_count
+    low_count_columns = total_counts[total_counts <= max_count]
+    
+    # Create a simple dataframe
+    low_count_df = pd.DataFrame({
+        'column_name': low_count_columns.index,
+        'count': low_count_columns.values
+    }).sort_values('count')
+    
+    # Export to CSV
+    low_count_df.to_csv('./data/low_count_columns_2000-2500.csv', index=False)
 
+    
+    return low_count_df
 
-    final_df = pd.concat(all_dfs)
-    final_df.to_csv(f'./data/full_eda.csv', index=False)
+def plot_counts(df):
+    # Create histogram
+    counts = df.count()
+    exclude_cols = [
+        # Technology
+        'technology', 'software', 'ai', 'machine learning',
+        'cloud', 'saas', 'platform', 'digital', 'data', 'analytics', 'algorithm',
+        'automation', 'blockchain', 'cryptocurrency', 'cybersecurity',
+        'subscription', 'recurring','e-commerce', 'mobile', 'app', 'virtual',
+        
+        # Industry specific
+        'healthcare', 'biotech', 'pharmaceutical', 'medical', 'clinical',
+        'energy', 'renewable', 'solar', 'electric', 'battery',
+        'real estate', 'logistics', 'transportation', 'automotive',
 
-    no_files_df = pd.DataFrame(no_files_found, columns=['Symbol'])
-    no_files_df.to_csv('./data/no_files_found.csv', index=False)
+        # Other
+        'Day', 'IPO Date', 'Open', 'Close', 'Public Price Per Share', 'Price Public Total', 'IPO_Date', 'UBS', 'Ubs', 'Price_Public_Total', 'Symbol'
+    ]
+    filter_counts = counts.drop(exclude_cols, errors='ignore')
 
-    unparsed_df = pd.DataFrame(unparsed_symbols, columns=['Symbol'])
-    unparsed_df.to_csv('./data/unparsed.csv', index=False)
+    # Get top 50
+    top_50 = filter_counts.nlargest(100)
 
-main() 
+    # Create bar chart
+    fig = px.bar(
+        x=top_50.index,
+        y=top_50.values,
+        title="Top 50 Columns by Non-Null Count",
+        labels={'x': 'Column Name', 'y': 'Non-Null Count'}
+    )
+
+    # Rotate x-axis labels for readability
+    fig.update_layout(xaxis_tickangle=-45)
+    fig.show()
+
+def plot_diff_correlation(df):
+    df.drop(['Day', 'Symbol', 'Close', 'Volume'], axis=1, inplace=True)
+
+    # Remove total row
+    df_no_total = df.iloc[:-1]
+    
+    # Get diff values
+    diff_values = df_no_total['Diff']
+    
+    # Calculate correlation for each column with Diff
+    correlations = []
+    
+    for col in df_no_total.columns:
+        if col != 'Diff':  # Skip the Diff column itself
+            # For binary/categorical columns, use point-biserial correlation
+            col_values = df_no_total[col]
+            
+            # Skip if column is all null or has no variation
+            if col_values.notna().sum() < 2:
+                continue
+                
+            corr = col_values.corr(diff_values)
+            if not pd.isna(corr):
+                correlations.append({
+                    'column': col,
+                    'correlation': corr,
+                    'abs_correlation': abs(corr),
+                    'count': col_values.notna().sum()
+                })
+    
+    # Convert to DataFrame and sort by absolute correlation
+    corr_df = pd.DataFrame(correlations).sort_values('abs_correlation', ascending=False)
+    
+    # Show top positive and negative correlations
+    print("Top 20 POSITIVE correlations (associated with higher Diff):")
+    top_positive = corr_df[corr_df['correlation'] > 0].head(20)
+    for _, row in top_positive.iterrows():
+        print(f"  {row['column']}: {row['correlation']:.4f} (n={row['count']})")
+    
+    print("\nTop 20 NEGATIVE correlations (associated with lower Diff):")
+    top_negative = corr_df[corr_df['correlation'] < 0].head(20)
+    for _, row in top_negative.iterrows():
+        print(f"  {row['column']}: {row['correlation']:.4f} (n={row['count']})")
+    
+    # Plot top correlations
+    top_20_overall = corr_df.head(20)
+    
+    fig = px.bar(
+        top_20_overall,
+        x='correlation',
+        y='column',
+        orientation='h',
+        title='Top 20 People/Banks/Cities by Correlation with First-Day Price Change',
+        labels={'correlation': 'Correlation with Diff', 'column': 'Person/Bank/City'},
+        color='correlation',
+        color_continuous_scale='RdBu_r'
+    )
+    fig.update_layout(height=600)
+    fig.show()
+    
+def tiered_correlation_analysis(df):
+    df.drop(['Day', 'Symbol', 'Close', 'Volume'], axis=1, inplace=True)
+    df_no_total = df.iloc[:-1]
+    diff_values = df_no_total['Diff']
+    
+    # Analyze at different confidence levels
+    for min_count in [20, 15, 10, 7]:
+        correlations = []
+        
+        for col in df_no_total.columns:
+            if col != 'Diff':
+                col_values = df_no_total[col]
+                count = col_values.notna().sum()
+                
+                if count >= min_count:
+                    corr = col_values.corr(diff_values)
+                    if not pd.isna(corr):
+                        correlations.append({
+                            'column': col,
+                            'correlation': corr,
+                            'count': count
+                        })
+        
+        corr_df = pd.DataFrame(correlations).sort_values('correlation', key=abs, ascending=False)
+        
+        print(f"\n{'='*50}")
+        print(f"TIER: Minimum {min_count} appearances ({len(corr_df)} entities)")
+        print(f"{'='*50}")
+        
+        if len(corr_df) > 0:
+            print("Top 20 Positive:")
+            for _, row in corr_df[corr_df['correlation'] > 0].head(20).iterrows():
+                print(f"  {row['column']}: +{row['correlation']:.4f} (n={row['count']})")
+            
+            print("Top 20 Negative:")
+            for _, row in corr_df[corr_df['correlation'] < 0].head(20).iterrows():
+                print(f"  {row['column']}: {row['correlation']:.4f} (n={row['count']})")
+        else:
+            print("No entities meet this threshold.")
+        
+
+build_dataset()
+# df = pd.read_csv('./data/eda_dataset.csv')
+# plot_counts(df)
+# plot_diff_correlation(df)
+# tiered_correlation_analysis(df)
