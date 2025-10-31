@@ -155,6 +155,17 @@ def export_low_count_columns(df, index, max_count=6):
     # Export to CSV
     low_count_df.to_csv(f'./data/low_count_columns_{index}.csv', index=False)
 
+def add_urls_to_keyword_analysis():
+    keyword_df = pd.read_csv('./datasets/keyword_analysis_copy.csv')
+    ipo_df = pd.read_csv('./data/ipo_day_summary.csv')
+    keyword_df.columns = keyword_df.columns.str.lower()
+    ipo_df.columns = ipo_df.columns.str.lower()
+
+    new_df = pd.merge(keyword_df, ipo_df[['symbol', 'public_price_per_share', 'price_public_total', 'url', 'ipo_date']], how='left', on=['symbol', 'public_price_per_share', 'price_public_total' ])
+    new_df.drop_duplicates(subset=['symbol'], inplace=True)
+    new_df.to_csv('./datasets/keyword_analysis_merge.csv', index=False)
+
+
 def main():
     files = get_files_in_directory('./data/keyword_datasets/keywords_removed')
 
@@ -168,4 +179,5 @@ def main():
     df.to_csv('./data/keyword_datasets/keyword_dataset_summary.csv', index=False)
 
 
-main()
+# main()
+add_urls_to_keyword_analysis()
