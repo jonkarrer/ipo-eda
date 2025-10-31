@@ -35,6 +35,60 @@ def try_to_get_file(dir_name, file_name):
         else:
             return False
 
+def nightly_build():
+    files = pd.read_csv('./data/ipo_day_summary.csv')
+    files = files[['symbol', 'url', 'public_price_per_share']]
+    files = files.drop_duplicates(subset=['symbol'])
+    files['url'] = files['url'].apply(lambda x: x.split('/')[-1])
+
+    batches = [(0, 500), (500, 1000), (1000, 1500), (1500, 2000), (2000, 2500), (2500, 3000)]
+    batch_index=0
+    for batch in batches:
+        batch_dfs = []
+        
+        for i,tuple in enumerate(list(files.itertuples(index=False))):
+            dir_name=tuple[0]
+            file_name=tuple[1]
+            public_price_per_share=tuple[2]
+
+
+            # Set batch bounds
+            batch_start=batch[0]
+            batch_end=batch[1]
+            batch_index += 1
+
+            # Want to not continue if the batch is below the start
+            if i < batch_start:
+                continue
+
+            # Get file coordinates
+            file_name="word_analysis_2.csv"
+            file_path = try_to_get_file(dir_name, file_name) 
+
+            # File may not exist
+            if file_path == False:
+                continue
+            
+            ipo_df = pd.read_csv(file_path)
+            ipo_df = ipo_df[[col for col in ipo_df.columns 
+                       if not any(word in col for word in columns_to_remove)]]
+            ipo_df['Symbol'] = dir_name
+            ipo_df['Public_Price_Per_Share'] = public_price_per_share
+
+            ipo_df.to_csv(f'./data/sec-ipo-files/{dir_name}/nightly_build.csv', index=False)
+            batch_dfs.append(ipo_df)
+
+            # Want to break if the batch is above the end, thus need to move to the next batch
+            if i >= batch_end:
+                break
+        
+        print(f"Concatenating Batch {batch}...") 
+        combined_batches = pd.concat(batch_dfs)
+        export_low_count_columns(combined_batches, batch_index)
+        combined_batches.loc['Total'] = combined_batches.count()
+        combined_batches.to_csv(f'./data/keyword_datasets/batch_{batch_index}.csv', index=False)
+
+
 def build_dataset():
     all_dfs = []
     
@@ -87,7 +141,7 @@ def build_dataset():
     c.loc['Total'] = c.count()
     c.to_csv('./data/eda_dataset_temp.csv', index=False)
 
-def export_low_count_columns(df, max_count=10):
+def export_low_count_columns(df, index, max_count=6):
     # Get the total counts from the last row
     df.loc['Total'] = df.count()
     total_counts = df.iloc[-1]
@@ -102,10 +156,7 @@ def export_low_count_columns(df, max_count=10):
     }).sort_values('count')
     
     # Export to CSV
-    low_count_df.to_csv('./data/low_count_columns_2000-2500.csv', index=False)
-
-    
-    return low_count_df
+    low_count_df.to_csv(f'./data/low_count_columns_{index}.csv', index=False)
 
 def plot_counts(df):
     # Create histogram
@@ -243,7 +294,8 @@ def tiered_correlation_analysis(df):
             print("No entities meet this threshold.")
         
 
-build_dataset()
+# build_dataset()
+nightly_build()
 # df = pd.read_csv('./data/eda_dataset.csv')
 # plot_counts(df)
 # plot_diff_correlation(df)
