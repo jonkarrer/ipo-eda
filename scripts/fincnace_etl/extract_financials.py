@@ -1,0 +1,51 @@
+import os
+import pandas as pd
+
+
+finance_keywords= ['Revenue', 'Accounts Receivable', 'Liabilities', 'Assets', 'Cash', 'Common Stock', 'Differed Tax', 'Inventory', 'Earnings', 'Operating Loss', 'Months Ended', 'Year Ended', 'Depreciation']
+column_keywords = ['Six Months End', 'Twelve Months End', 'Year Ended', 'Six Months Ended', 'Twelve Months Ended', 'Years Ended', 'Years End', 'Period From']
+
+def extract_table_data(file_path):
+    df = pd.read_html(file_path)
+    return df
+
+def find_finance_tables(df):
+    all_dfs = []
+
+    for item in df:
+        for w in finance_keywords:
+            exists = item.astype(str).apply(lambda x: x.str.contains(w, case=False, na=False)).any().any()
+            if exists:
+                is_small = item.shape[0] < 4
+                if is_small:
+                    continue
+                all_dfs.append(item) 
+
+    return all_dfs
+
+def main():
+    ipo_df = pd.read_csv('./datasets/keyword_analysis_with_url.csv')
+    ipo_df = ipo_df[['symbol', 'url']]
+    ipo_df['url'] = ipo_df['url'].apply(lambda x: x.split('/')[-1])
+
+    for tuple in list(ipo_df.itertuples(index=False)):
+        # Extract file coordinates
+        dir_name=tuple[0]
+        file_name=tuple[1]
+
+        # Extract table data from html
+        df = extract_table_data(f'./data/sec-ipo-files/{dir_name}/{file_name}')
+        finance_dfs = find_finance_tables(df)
+
+        # Create folder if it doesn't exist to store data
+        os.makedirs(f'./data/sec-ipo-finance/{dir_name}/financial', exist_ok=True)
+
+        # Save tables to folder
+        for i,f_df in enumerate(finance_dfs):
+            f_df.to_csv(f'./data/sec-ipo-finance/{dir_name}/financial/{i}.csv', index=False)
+
+        # Create combined dataframe 
+        combined_df = pd.concat(finance_dfs)
+        combined_df.to_csv(f'./data/sec-ipo-finance/{dir_name}/financial/combined.csv', index=False)
+
+main()  
