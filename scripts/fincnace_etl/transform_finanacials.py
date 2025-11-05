@@ -149,9 +149,40 @@ def format_df(df):
     return df
 
 def calculate_trend_and_recent(df):
-    df['trend'] = df.groupby('symbol')['value'].diff()
-    df['recent'] = df.groupby('symbol')['value'].shift(1)
+    
+    for name, group in df.groupby('symbol'):
+        df[f'{name}_trend'] = group['value'].diff()
+        df[f'{name}_recent'] = group['value'].shift(-1)
 
+    return df
+
+def filter_important_rows(df):
+    finance_keywords = [
+        'Revenue', 'Accounts Receivable', 'Basic Earnings Per Share', 'Accounts Payable', 
+        'Accrued Interest', 'Liabilities', 'Assets', 'Cash', 'Common Stock', 
+        'Inventory', 'Earnings', 'Operating Loss', 'Depreciation', 'Cost of Revenue', 
+        'Cost of Goods Sold', 'Gross Profit', 'Net Income', 'Net Profit',
+        'Net Revenue', 'Deferred Revenue', 'Deferred Tax', 'Free Cash Flow', 
+        'Inventories', 'Land', 'Long Term Debt', 'Machinery', 'Equipment', 
+        'Machinery and Equipment', 'Operating Income', 'Net Loss', 'Net Assets', 
+        'Net Change in Cash', 'Other Assets', 'Other Current Assets', 
+        'Other Liabilities', 'Property'
+    ]
+
+    # Ensure string type for both columns
+    df['symbol'] = df['symbol'].astype(str)
+    df['context_date'] = df['context_date'].astype(str)
+    
+    # Filter by finance keywords in symbol column
+    df = df[df['symbol'].str.contains('|'.join(finance_keywords), case=False, na=False)]
+    
+    # Filter by symbol length
+    df = df[df['symbol'].str.len() <= 25]
+    
+    # Clean and filter by context_date - more flexible pattern
+    df['context_date'] = df['context_date'].str.strip()
+    df = df[df['context_date'].str.contains(r'Year\s+Ended?', case=False, na=False, regex=True)]
+    
     return df
 
 def clean_out_columns_and_rows(file_path):
@@ -190,6 +221,7 @@ def main():
 file_path= f'./data/sec-ipo-finance/ADT/financial/combined_clean_02.csv';
 df = pd.read_csv(file_path)
 df = format_df(df)
+df = filter_important_rows(df)
 df = calculate_trend_and_recent(df)
 df.to_csv(f'./data/try_this.csv', index=False)
 # df.to_csv(f'./data/sec-ipo-finance/ADT/financial/combined_clean_02.csv', index=False)
