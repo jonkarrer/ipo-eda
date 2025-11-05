@@ -148,6 +148,11 @@ def format_df(df):
 
     return df
 
+def calculate_trend_and_recent(df):
+    df['trend'] = df.groupby('symbol')['value'].diff()
+    df['recent'] = df.groupby('symbol')['value'].shift(1)
+
+    return df
 
 def clean_out_columns_and_rows(file_path):
     try:
@@ -185,5 +190,6 @@ def main():
 file_path= f'./data/sec-ipo-finance/ADT/financial/combined_clean_02.csv';
 df = pd.read_csv(file_path)
 df = format_df(df)
+df = calculate_trend_and_recent(df)
 df.to_csv(f'./data/try_this.csv', index=False)
 # df.to_csv(f'./data/sec-ipo-finance/ADT/financial/combined_clean_02.csv', index=False)
