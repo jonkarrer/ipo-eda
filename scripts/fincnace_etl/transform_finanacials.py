@@ -182,7 +182,7 @@ def filter_important_rows(df):
     # Clean and filter by context_date - more flexible pattern
     df['context_date'] = df['context_date'].str.strip()
     df = df[df['context_date'].str.contains(r'Year\s+Ended?', case=False, na=False, regex=True)]
-    
+    df = df[df['symbol'].str.not_contains(')')]
     return df
 
 def clean_out_columns_and_rows(file_path):
