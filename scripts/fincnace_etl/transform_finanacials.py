@@ -144,6 +144,8 @@ def locate_value_and_date(file_path):
 def format_df(df):
     df = df.drop_duplicates(subset=['symbol', 'value', 'context_date', 'date'], keep='first')
     df.loc[:, 'date'] = pd.to_datetime(df['date'])
+    df.loc[:,'symbol'] = df['symbol'].astype(str).str.lower()
+    df.loc[:,'context_date'] = df['context_date'].astype(str)
     df = df.sort_values(by=['symbol', 'date'])
 
     return df
@@ -159,30 +161,35 @@ def calculate_trend_and_recent(df):
 def filter_important_rows(df):
     finance_keywords = [
         'Revenue', 'Accounts Receivable', 'Basic Earnings Per Share', 'Accounts Payable', 
-        'Accrued Interest', 'Liabilities', 'Assets', 'Cash', 'Common Stock', 
-        'Inventory', 'Earnings', 'Operating Loss', 'Depreciation', 'Cost of Revenue', 
-        'Cost of Goods Sold', 'Gross Profit', 'Net Income', 'Net Profit',
-        'Net Revenue', 'Deferred Revenue', 'Deferred Tax', 'Free Cash Flow', 
+        'Total Liabilities', 'Total Assets', 'Liabilities', 'Assets', 
+        'Cash', 'Common Stock', 'Debt', 'Inventory', 'Earnings', 'Operating Loss', 
+        'Depreciation', 'Cost of Revenue', 'Cost of Goods Sold', 'Gross Profit', 'Net Income', 
+        'Net Profit', 'Net Revenue', 'Total Revenue', 'Free Cash Flow',
         'Inventories', 'Land', 'Long Term Debt', 'Machinery', 'Equipment', 
         'Machinery and Equipment', 'Operating Income', 'Net Loss', 'Net Assets', 
-        'Net Change in Cash', 'Other Assets', 'Other Current Assets', 
-        'Other Liabilities', 'Property'
+        'Other Assets', 'Other Current Assets', 'Cash and Cash Equivalents',
+        'Other Liabilities', 'Property', 'Operating Expenses',
     ]
 
-    # Ensure string type for both columns
-    df['symbol'] = df['symbol'].astype(str)
-    df['context_date'] = df['context_date'].astype(str)
-    
     # Filter by finance keywords in symbol column
-    df = df[df['symbol'].str.contains('|'.join(finance_keywords), case=False, na=False)]
+    finance_keywords_lower = [keyword.lower() for keyword in finance_keywords]
+
+    # Exact match using isin (not str.isin - that's not a method)
+    df = df[df['symbol'].isin(finance_keywords_lower)]
+
+    # Remove dupe dates
+    df = df.sort_values('value').drop_duplicates(subset=['symbol', 'date'], keep='last')
     
-    # Filter by symbol length
-    df = df[df['symbol'].str.len() <= 25]
+    # Part 1: Exact match for "Month DD, YYYY" format
+    date_exact = df['context_date'].str.match(r'^[A-Za-z]+\s+\d{1,2},\s+\d{4}$', case=False, na=False)
+
+    # Part 2: Contains match for "Year End" variations
+    year_end_contains = df['context_date'].str.contains(r'Years?\s+Ended?', case=False, na=False, regex=True)
+
+    # Combine conditions with OR
+    df = df[date_exact | year_end_contains]
+    df = df.sort_values(['symbol', 'date'])
     
-    # Clean and filter by context_date - more flexible pattern
-    df['context_date'] = df['context_date'].str.strip()
-    df = df[df['context_date'].str.contains(r'Year\s+Ended?', case=False, na=False, regex=True)]
-    df = df[df['symbol'].str.not_contains(')')]
     return df
 
 def clean_out_columns_and_rows(file_path):
@@ -222,6 +229,6 @@ file_path= f'./data/sec-ipo-finance/ADT/financial/combined_clean_02.csv';
 df = pd.read_csv(file_path)
 df = format_df(df)
 df = filter_important_rows(df)
-df = calculate_trend_and_recent(df)
+# df = calculate_trend_and_recent(df)
 df.to_csv(f'./data/try_this.csv', index=False)
 # df.to_csv(f'./data/sec-ipo-finance/ADT/financial/combined_clean_02.csv', index=False)
