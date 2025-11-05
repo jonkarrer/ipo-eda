@@ -133,6 +133,7 @@ def locate_value_and_date(file_path):
             if number_value is not None and column_dates[col_idx] is not None:
                 new_rows.append({
                     'symbol': row_name,
+                    'context_date': combined_date_str,
                     'date': column_dates[col_idx],
                     'value': number_value
                 })
