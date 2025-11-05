@@ -6,7 +6,22 @@ finance_keywords= ['Revenue', 'Accounts Receivable', 'Liabilities', 'Assets', 'C
 column_keywords = ['Six Months End', 'Twelve Months End', 'Year Ended', 'Six Months Ended', 'Twelve Months Ended', 'Years Ended', 'Years End', 'Period From']
 
 def extract_table_data(file_path):
-    df = pd.read_html(file_path)
+    try:
+        df = pd.read_html(file_path)
+    except ValueError as e:
+        if "No tables found" in str(e):
+            print("No HTML tables found in the file")
+            df = None
+        else:
+            print(f"ValueError: {e}")
+            df = None
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        df = None
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        df = None
+
     return df
 
 def find_finance_tables(df):
@@ -35,7 +50,13 @@ def main():
 
         # Extract table data from html
         df = extract_table_data(f'./data/sec-ipo-files/{dir_name}/{file_name}')
+        if df is None:
+            continue
         finance_dfs = find_finance_tables(df)
+
+        if len(finance_dfs) == 0:
+            print(f'No finance data found for {dir_name},')
+            continue
 
         # Create folder if it doesn't exist to store data
         os.makedirs(f'./data/sec-ipo-finance/{dir_name}/financial', exist_ok=True)
