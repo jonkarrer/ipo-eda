@@ -17,18 +17,26 @@ def regex_date(text):
     if not isinstance(text, str):
         return None
     
-    # More flexible pattern that handles various spacing and formats
+    # More flexible patterns that can handle accumulated text
     patterns = [
-        r"(January|February|March|April|May|June|July|August|September|October|November|December)\s*(\d{1,2}),?\s*(\d{4})",  # Month Day, Year or Month Day Year
-        r"For\s+the\s+.*?ended\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s*(\d{1,2}),?\s*(\d{4})",  # "For the year ended..."
-        r"(January|February|March|April|May|June|July|August|September|October|November|December)\s*(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})"  # Month 1st, Year
+        # Standard formats
+        r"(January|February|March|April|May|June|July|August|September|October|November|December)\s*(\d{1,2}),?\s*(\d{4})",
+        
+        # "For the year ended..." formats
+        r"For\s+the\s+.*?ended\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s*(\d{1,2}),?\s*(\d{4})",
+        
+        # Handle accumulated parts like "For The Years Ended December 31, 2016"
+        r".*?(January|February|March|April|May|June|July|August|September|October|November|December)\s*(\d{1,2}),?\s*(\d{4})",
+        
+        # Handle "December 31, 2016" pattern
+        r"(January|February|March|April|May|June|July|August|September|October|November|December)\s*(\d{1,2}),\s*(\d{4})",
     ]
     
     for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)  # Case insensitive
+        match = re.search(pattern, text, re.IGNORECASE)
         if match:
-            if len(match.groups()) == 3:
-                month, day, year = match.groups()
+            if len(match.groups()) >= 3:
+                month, day, year = match.groups()[:3]
                 return f"{month} {day}, {year}"
     
     return None
@@ -70,66 +78,67 @@ def locate_value_and_date(file_path):
     except FileNotFoundError:
         return None 
     
-    recent_date = None
     new_rows = []
+    column_dates = [None] * len(df.columns)
+    date_header_rows = []  # Accumulate rows without symbols
     
-    # Iterate through rows
     for row_idx, row in df.iterrows():
-        try:
-            # Safer way to get the first column value
-            row_name = row.iloc[0] if len(row) > 0 and not pd.isna(row.iloc[0]) else ""
-            row_name = str(row_name)  # Convert to string safely
-        except (IndexError, KeyError):
-            continue  # Skip this row if we can't get the first column
+        row_name = str(row.iloc[0]) if not pd.isna(row.iloc[0]) else ""
         
-        # Iterate through all columns in the row
-        for col_idx in range(len(row)):
-            try:
-                row_value = row.iloc[col_idx]
-            except (IndexError, KeyError):
-                continue
+        # If first column is empty, this is probably a date header row
+        if not row_name or row_name.strip() == "":
+            date_header_rows.append(row)
+            # print(f"Row {row_idx}: Accumulated date header row")
+            continue
+        
+        # We hit a row with a symbol - process accumulated date headers
+        if date_header_rows:
+            # print(f"Processing {len(date_header_rows)} accumulated date header rows")
             
-            # If nan, skip
-            if pd.isna(row_value):
-                continue
-            
-            # Convert to string for processing
-            row_value_str = str(row_value)
-            
-            # Check if the value is a date
-            is_date = regex_date(row_value_str)
-            
-            if is_date:
-                # Update the recent date
-                recent_date = row_value_str
-            else:
-                # Check if it's a number
-                number_value = None
-                if isinstance(row_value, str):
-                    number_value = regex_number(row_value)
-                elif isinstance(row_value, (int, float)):
-                    number_value = row_value
-                else:
-                    # Try to extract number from string representation
-                    number_value = regex_number(row_value_str)
+            # Combine date parts column-wise
+            for col_idx in range(len(df.columns)):
+                column_date_parts = []
                 
-                # Only add a row if we have both a recent date and a valid number
-                if recent_date is not None and number_value is not None:
-                    new_row = {
-                        'symbol': row_name,
-                        'context_date': recent_date,
-                        'date': regex_date(recent_date),
-                        'value': number_value
-                    }
-                    new_rows.append(new_row)
+                for header_row in date_header_rows:
+                    if col_idx < len(header_row) and not pd.isna(header_row.iloc[col_idx]):
+                        part = str(header_row.iloc[col_idx]).strip()
+                        if part:
+                            column_date_parts.append(part)
+                
+                # Try to parse the combined parts as a date
+                if column_date_parts:
+                    combined_date_str = ' '.join(column_date_parts)
+                    date_match = regex_date(combined_date_str)
+                    
+                    if date_match:
+                        column_dates[col_idx] = date_match
+                        # print(f"Column {col_idx}: '{combined_date_str}' → {date_match}")
+            
+            # Clear accumulated headers
+            date_header_rows = []
+        
+        # Process this data row for numbers
+        for col_idx, cell_value in enumerate(row):
+            if pd.isna(cell_value) or col_idx == 0:  # Skip NaN and first column
+                continue
+            
+            # Check if it's a number
+            number_value = None
+            if isinstance(cell_value, str):
+                number_value = regex_number(cell_value)
+            elif isinstance(cell_value, (int, float)):
+                number_value = cell_value
+            
+            # Add row if we have both date and number for this column
+            if number_value is not None and column_dates[col_idx] is not None:
+                new_rows.append({
+                    'symbol': row_name,
+                    'date': column_dates[col_idx],
+                    'value': number_value
+                })
+                # print(f"Added: {row_name}, {column_dates[col_idx]}, {number_value}")
     
-    # Create DataFrame from collected rows
-    new_df = pd.DataFrame(new_rows).sort_values(by=['symbol'], ascending=[True])
-    return new_df
-
-
-
-
+    return pd.DataFrame(new_rows)
 
 def clean_out_columns_and_rows(file_path):
     try:
@@ -156,13 +165,13 @@ def main():
     for tuple in list(ipo_df.itertuples(index=False)):
         # Extract file coordinates
         dir_name=tuple[0]
-        df = clean_out_columns_and_rows(f'./data/sec-ipo-finance/{dir_name}/financial/combined.csv')
+        df = locate_value_and_date(f'./data/sec-ipo-finance/{dir_name}/financial/combined_clean_01.csv')
         if df is None:
             continue
         df.to_csv(f'./data/sec-ipo-finance/{dir_name}/financial/combined_clean_02.csv', index=False)
 
 # main()
 
-df = locate_value_and_date('./data/sec-ipo-finance/ADT/financial/combined_clean_01.csv')
+df = locate_value_and_date('./data/sec-ipo-finance/BLNKW/financial/combined_clean_01.csv')
 df.to_csv(f'./data/try_this.csv', index=False)
 # df.to_csv(f'./data/sec-ipo-finance/ADT/financial/combined_clean_02.csv', index=False)
