@@ -70,48 +70,62 @@ def locate_value_and_date(file_path):
     except FileNotFoundError:
         return None 
     
-    new_rows = []
     recent_date = None
+    new_rows = []
     
+    # Iterate through rows
     for row_idx, row in df.iterrows():
-        row_name = str(row.iloc[0]) if not pd.isna(row.iloc[0]) else ""
+        try:
+            # Safer way to get the first column value
+            row_name = row.iloc[0] if len(row) > 0 and not pd.isna(row.iloc[0]) else ""
+            row_name = str(row_name)  # Convert to string safely
+        except (IndexError, KeyError):
+            continue  # Skip this row if we can't get the first column
         
-        # Check if this entire row contains a date (common in financial statements)
-        row_as_string = ' '.join([str(cell) for cell in row if not pd.isna(cell)])
-        date_in_row = regex_date(row_as_string)
-        
-        if date_in_row:
-            recent_date = row_as_string
-            print(f"Found date section: {recent_date}")
-            continue  # Skip to next row, this row is just a date header
-        
-        # Process each cell in the row for numbers
-        for col_idx, cell_value in enumerate(row):
-            if pd.isna(cell_value):
+        # Iterate through all columns in the row
+        for col_idx in range(len(row)):
+            try:
+                row_value = row.iloc[col_idx]
+            except (IndexError, KeyError):
                 continue
             
-            # Skip the first column (it's the row name/symbol)
-            if col_idx == 0:
+            # If nan, skip
+            if pd.isna(row_value):
                 continue
+            
+            # Convert to string for processing
+            row_value_str = str(row_value)
+            
+            # Check if the value is a date
+            is_date = regex_date(row_value_str)
+            
+            if is_date:
+                # Update the recent date
+                recent_date = row_value_str
+            else:
+                # Check if it's a number
+                number_value = None
+                if isinstance(row_value, str):
+                    number_value = regex_number(row_value)
+                elif isinstance(row_value, (int, float)):
+                    number_value = row_value
+                else:
+                    # Try to extract number from string representation
+                    number_value = regex_number(row_value_str)
                 
-            # Check if it's a number
-            number_value = None
-            if isinstance(cell_value, str):
-                number_value = regex_number(cell_value)
-            elif isinstance(cell_value, (int, float)):
-                number_value = cell_value
-            
-            # Add row if we have date and number
-            if recent_date is not None and number_value is not None:
-                new_rows.append({
-                    'symbol': row_name,
-                    'context_date': recent_date,
-                    'date': regex_date(recent_date),
-                    'value': number_value
-                })
-                # print(f"Added: {row_name}, {recent_date}, {number_value}")
+                # Only add a row if we have both a recent date and a valid number
+                if recent_date is not None and number_value is not None:
+                    new_row = {
+                        'symbol': row_name,
+                        'context_date': recent_date,
+                        'date': regex_date(recent_date),
+                        'value': number_value
+                    }
+                    new_rows.append(new_row)
     
-    return pd.DataFrame(new_rows)
+    # Create DataFrame from collected rows
+    new_df = pd.DataFrame(new_rows).sort_values(by=['symbol'], ascending=[True])
+    return new_df
 
 
 
