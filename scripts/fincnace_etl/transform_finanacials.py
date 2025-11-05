@@ -80,7 +80,8 @@ def locate_value_and_date(file_path):
     
     new_rows = []
     column_dates = [None] * len(df.columns)
-    date_header_rows = []  # Accumulate rows without symbols
+    column_contexts = [None] * len(df.columns)  # Store the original date context
+    date_header_rows = []
     
     for row_idx, row in df.iterrows():
         row_name = str(row.iloc[0]) if not pd.isna(row.iloc[0]) else ""
@@ -88,12 +89,10 @@ def locate_value_and_date(file_path):
         # If first column is empty, this is probably a date header row
         if not row_name or row_name.strip() == "":
             date_header_rows.append(row)
-            # print(f"Row {row_idx}: Accumulated date header row")
             continue
         
         # We hit a row with a symbol - process accumulated date headers
         if date_header_rows:
-            # print(f"Processing {len(date_header_rows)} accumulated date header rows")
             
             # Combine date parts column-wise
             for col_idx in range(len(df.columns)):
@@ -112,7 +111,7 @@ def locate_value_and_date(file_path):
                     
                     if date_match:
                         column_dates[col_idx] = date_match
-                        # print(f"Column {col_idx}: '{combined_date_str}' → {date_match}")
+                        column_contexts[col_idx] = combined_date_str  # Store the context
             
             # Clear accumulated headers
             date_header_rows = []
@@ -133,13 +132,22 @@ def locate_value_and_date(file_path):
             if number_value is not None and column_dates[col_idx] is not None:
                 new_rows.append({
                     'symbol': row_name,
-                    'context_date': combined_date_str,
                     'date': column_dates[col_idx],
+                    'context_date': column_contexts[col_idx],  # Add the context
                     'value': number_value
                 })
-                # print(f"Added: {row_name}, {column_dates[col_idx]}, {number_value}")
-    
+
+    if new_rows is None:
+        return None
     return pd.DataFrame(new_rows)
+
+def format_df(df):
+    df = df.drop_duplicates(subset=['symbol', 'value', 'context_date', 'date'], keep='first')
+    df.loc[:, 'date'] = pd.to_datetime(df['date'])
+    df = df.sort_values(by=['symbol', 'date'])
+
+    return df
+
 
 def clean_out_columns_and_rows(file_path):
     try:
@@ -166,13 +174,16 @@ def main():
     for tuple in list(ipo_df.itertuples(index=False)):
         # Extract file coordinates
         dir_name=tuple[0]
-        df = locate_value_and_date(f'./data/sec-ipo-finance/{dir_name}/financial/combined_clean_01.csv')
+        file_path= f'./data/sec-ipo-finance/{dir_name}/financial/combined_clean_02.csv';
+        df = locate_value_and_date(file_path)
         if df is None:
             continue
         df.to_csv(f'./data/sec-ipo-finance/{dir_name}/financial/combined_clean_02.csv', index=False)
 
 # main()
 
-df = locate_value_and_date('./data/sec-ipo-finance/BLNKW/financial/combined_clean_01.csv')
+file_path= f'./data/sec-ipo-finance/ADT/financial/combined_clean_02.csv';
+df = pd.read_csv(file_path)
+df = format_df(df)
 df.to_csv(f'./data/try_this.csv', index=False)
 # df.to_csv(f'./data/sec-ipo-finance/ADT/financial/combined_clean_02.csv', index=False)
