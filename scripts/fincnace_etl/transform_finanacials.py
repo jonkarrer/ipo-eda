@@ -431,11 +431,11 @@ def step_six():
 
 def main():
     # step_one()
-    step_two()
+    # step_two()
     # step_three()
     # step_four()
     # step_five()
-    # step_six()
+    step_six()
 
 main()
 
