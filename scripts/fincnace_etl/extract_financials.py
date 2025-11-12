@@ -38,7 +38,9 @@ def find_finance_tables(df):
     return all_dfs
 
 def remove_empty_columns(df):
-    df = df.dropna(axis=1, how='all')
+    for col in df.columns:
+        if df[col].isnull().all():
+            df.drop(col, axis=1, inplace=True)
     return df
 
 def main():
