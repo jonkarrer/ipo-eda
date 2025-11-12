@@ -37,7 +37,9 @@ def find_finance_tables(df):
 
     return all_dfs
 
-
+def remove_empty_columns(df):
+    df = df.dropna(axis=1, how='all')
+    return df
 
 def main():
     ipo_df = pd.read_csv('./datasets/keyword_analysis_with_url.csv')
@@ -73,6 +75,7 @@ def main():
             f_df.to_csv(f'./data/sec-ipo-finance/{dir_name}/financial/{i}.csv', index=False)
 
         combined_df = pd.concat(finance_dfs)
+        final_df = remove_empty_columns(combined_df)
         combined_df.to_csv(f'./data/sec-ipo-finance/{dir_name}/financial/combined.csv', index=False)
 
 main() 
