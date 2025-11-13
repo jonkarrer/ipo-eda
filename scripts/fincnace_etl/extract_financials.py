@@ -38,10 +38,20 @@ def find_finance_tables(df):
     return all_dfs
 
 def remove_empty_columns(df):
+    columns_to_keep = []
+    
     for col in df.columns:
-        if df[col].isnull().all():
-            df.drop(col, axis=1, inplace=True)
-    return df
+        # Convert column to string and clean it
+        col_values = df[col].astype(str).str.strip()
+        # Remove invisible characters like zero-width spaces
+        col_values = col_values.str.replace('​', '').str.replace('\u200b', '')
+        
+        # Keep column if it has any non-empty values
+        if not col_values.eq('').all() and not col_values.eq('nan').all():
+            columns_to_keep.append(col)
+    
+    return df[columns_to_keep]
+
 
 def main():
     ipo_df = pd.read_csv('./datasets/keyword_analysis_with_url.csv')
@@ -52,18 +62,18 @@ def main():
         # Extract file coordinates
         dir_name=tuple[0]
         file_name=tuple[1]
-        if dir_name != 'SMLR':
-            continue
-        print(dir_name, file_name)
+        
         # Extract table data from html
         df = extract_table_data(f'./data/sec-ipo-files/{dir_name}/{file_name}')
-        # print(df.head())
         if df is None:
             print(f'df not made {dir_name}')
+            continue
+
         finance_dfs = find_finance_tables(df)
 
         if len(finance_dfs) == 0:
             print(f'No finance data found for {dir_name},')
+            continue
 
         # Create folder if it doesn't exist to store data
         os.makedirs(f'./data/sec-ipo-finance/{dir_name}/financial', exist_ok=True)
@@ -78,34 +88,6 @@ def main():
 
         combined_df = pd.concat(finance_dfs)
         final_df = remove_empty_columns(combined_df)
-        combined_df.to_csv(f'./data/sec-ipo-finance/{dir_name}/financial/combined.csv', index=False)
+        final_df.to_csv(f'./data/sec-ipo-finance/{dir_name}/financial/combined.csv', index=False)
 
 main() 
-
-
-
-def mane():
-    # Extract file coordinates
-    dir_name='SMLR'
-    file_name=tuple[1]
-
-    # Extract table data from html
-    df = extract_table_data(f'./data/sec-ipo-files/{dir_name}/{file_name}')
-    if df is None:
-        print(f'df not made {dir_name}')
-
-    finance_dfs = find_finance_tables(df)
-
-    if len(finance_dfs) == 0:
-        print(f'No finance data found for {dir_name},')
-
-    # Create folder if it doesn't exist to store data
-    os.makedirs(f'./data/sec-ipo-finance/{dir_name}/financial', exist_ok=True)
-
-    # Save tables to folder
-    for i,f_df in enumerate(finance_dfs):
-        f_df.to_csv(f'./data/sec-ipo-finance/{dir_name}/financial/{i}.csv', index=False)
-
-    # Create combined dataframe 
-    combined_df = pd.concat(finance_dfs)
-    combined_df.to_csv(f'./data/sec-ipo-finance/{dir_name}/financial/combined.csv', index=False)
