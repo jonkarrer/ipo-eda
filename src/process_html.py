@@ -6,7 +6,7 @@ from io import StringIO
 finance_keywords= ['Revenue', 'Accounts Receivable', 'Liabilities', 'Assets', 'Cash', 'Common Stock', 'Differed Tax', 'Inventory', 'Earnings', 'Operating Loss', 'Months Ended', 'Year Ended', 'Depreciation']
 column_keywords = ['Six Months End', 'Twelve Months End', 'Year Ended', 'Six Months Ended', 'Twelve Months Ended', 'Years Ended', 'Years End', 'Period From']
 
-def clean_html_file(file_path):
+def clean_html_file_and_stringify(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
         html_content= file.read()
     
@@ -24,7 +24,7 @@ def clean_html_file(file_path):
 
     return html_content
 
-def create_df_from_html_string(html_content):
+def create_df_from_html_tables(html_content):
     try:
         df = pd.read_html(StringIO(html_content))
     except ValueError as e:
@@ -53,13 +53,20 @@ def find_finance_tables(df, finance_keywords):
     return all_dfs
 
 def extract_finance_tables_from_html(file_path, finance_keywords):
-    html_content = clean_html_file(file_path)
-    raw_dfs_list = create_df_from_html_string(html_content)
-    finance_df = find_finance_tables(raw_dfs_list, finance_keywords)
-    if len(finance_df) == 0:
+    # Grab html file, clean it, and stringify it
+    html_content_string = clean_html_file_and_stringify(file_path)
+
+    # Find all the html tables in the file
+    html_table_dfs = create_df_from_html_tables(html_content_string)
+    if html_table_dfs is None or len(html_table_dfs) == 0:
         return None
 
-    return finance_df
+    # Find all the finance tables from the list of tables
+    finance_table_dfs = find_finance_tables(html_table_dfs, finance_keywords)
+    if finance_table_dfs is None or len(finance_table_dfs) == 0:
+        return None
+    
+    return finance_table_dfs
 
 def save_each_finance_table_df(dir_name, finance_dfs):
     # Create folder if it doesn't exist to store data
