@@ -87,7 +87,12 @@ def format_and_filter_rows(df):
 
     df = df.drop_duplicates(subset=['symbol', 'value', 'context_date', 'date'], keep='first')
     df.loc[:, 'date'] = pd.to_datetime(df['date'], format='mixed', errors='coerce')
-    df.loc[:,'symbol'] = df['symbol'].astype(str).str.lower().replace(r'[",\'\u2019]', '', regex=True).str.lower()
+    df.loc[:,'symbol'] = (df['symbol']
+                     .astype(str)
+                     .str.lower()
+                     .replace(r'[",\'\u2019:;().·]', '', regex=True)  # Remove punctuation
+                     .str.replace(r'\s+', ' ', regex=True)            # Clean up extra spaces
+                     .str.strip())                                    # Remove leading/trailing spaces
     df.loc[:,'context_date'] = df['context_date'].astype(str)
     df = df.sort_values(by=['symbol', 'date'])
 
