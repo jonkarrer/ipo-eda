@@ -1,18 +1,16 @@
 from utils import create_df_from_csv
 import pandas as pd
 
-def remove_mostly_nan_columns(df):
-    threshold = len(df) * 0.80
-    df = df.dropna(thresh=threshold, axis=1)
-    return df
+
+def join_keywords_with_financials(fin_df, keyword_df):
+    fin_df = create_df_from_csv("./data/all_financial_reduced.csv")
+    keyword_df = create_df_from_csv('./datasets/keyword_analysis_with_url.csv')
+    joined_df = join_keywords_with_financials(fin_df, keyword_df)
+    # joined_df.to_csv('./data/all_financial_with_keywords.csv', index=False)
+    return joined_df
+
 
 def main():
-    df = create_df_from_csv("./data/all_financial.csv")
-    # cols_df = pd.DataFrame({"column": df.columns})
-    # cols_df.to_csv("./data/columns.csv", index=False)
-    df = remove_mostly_nan_columns(df)
-    print(df.shape)
-    df.to_csv("./data/all_financial_reduced.csv", index=False)
-
+    df = join_keywords_with_financials()
 
 main()
