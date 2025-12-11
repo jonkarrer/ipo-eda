@@ -1,4 +1,5 @@
 from utils import column_has_numbers, is_date_in_row, regex_format_date, regex_format_number, to_snake_case
+from process_html import clean_html_file_and_stringify
 import pandas as pd
 import re
 
@@ -166,3 +167,15 @@ def pivot_df(df):
     result = result.dropna(axis=1, how='any')
 
     return result
+
+# Sixth: Calculate IPO Prospectus Document Length
+def calculate_document_length(df, symbol):
+    file_name = df['url']
+    file_name = file_name.split('/')[-1]
+    file_path = f'./data/sec-ipo-files/{symbol}/{file_name}'
+    html_content = clean_html_file_and_stringify(file_path)
+    document_length = len(html_content)
+
+    df['document_length'] = document_length
+
+    return df 

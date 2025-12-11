@@ -1,4 +1,4 @@
-from process_html import html_tables_to_csv 
+from process_html import html_tables_to_csv, clean_html_file_and_stringify
 from clean_csv import clean_out_columns_and_rows, locate_value_and_date, format_and_filter_rows, calculate_trend_and_recent, pivot_df
 from utils import create_df_from_csv
 import pandas as pd
@@ -32,6 +32,11 @@ def create_training_dataset(ipo_list):
         df = calculate_trend_and_recent(df)
         if df is None or df.columns.size == 0:
             print(f'E: Could not calculate trend and recent for {dir_name},')
+            continue
+
+        df = calculate_document_length(df, dir_name)
+        if df is None or df.columns.size == 0:
+            print(f'G: Could not calculate document length for {dir_name},')
             continue
 
         # Convert tuple to dictionary
@@ -78,19 +83,32 @@ def clean_training_dataset():
     df = remove_mostly_nan_columns(df)
     df.to_csv("./data/all_financial_reduced.csv", index=False)
 
+# def main():
+#     # Gather file locations to process into a dataframe
+#     ipo_list = create_df_from_csv('./datasets/keyword_analysis_with_url.csv')
+#     ipo_list = ipo_list[['symbol', 'url']]
+#     ipo_list['url'] = ipo_list['url'].apply(lambda x: x.split('/')[-1])
+
+#     # Extract html tables related to financial from raw/dirty SEC ipo prospectus files into csv files
+#     html_tables_to_csv(ipo_list)
+
+#     # Create training dataset from those csv files
+#     create_training_dataset(ipo_list)
+
+#     # Clean training dataset
+#     clean_training_dataset()
+
+def calculate_document_length(row):
+    file_name = row['url'].split('/')[-1]
+    file_path = f'./data/sec-ipo-files/{row["symbol"]}/{file_name}'
+    html_content = clean_html_file_and_stringify(file_path)
+    return len(html_content)
+
 def main():
-    # Gather file locations to process into a dataframe
-    ipo_list = create_df_from_csv('./datasets/keyword_analysis_with_url.csv')
-    ipo_list = ipo_list[['symbol', 'url']]
-    ipo_list['url'] = ipo_list['url'].apply(lambda x: x.split('/')[-1])
+    df = create_df_from_csv("./datasets/all_financial_with_keywords.csv")
+    df['document_length'] = df.apply(calculate_document_length, axis=1)
+    df.to_csv("./datasets/all_financial_with_keywords_test.csv", index=False)
 
-    # Extract html tables related to financial from raw/dirty SEC ipo prospectus files into csv files
-    html_tables_to_csv(ipo_list)
 
-    # Create training dataset from those csv files
-    create_training_dataset(ipo_list)
-
-    # Clean training dataset
-    clean_training_dataset()
 
 main()
