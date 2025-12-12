@@ -1,4 +1,4 @@
-from process_html import html_tables_to_csv, clean_html_file_and_stringify
+from process_html import html_tables_to_csv, clean_html_file_and_stringify, clean_html_file_and_get_text
 from clean_csv import clean_out_columns_and_rows, locate_value_and_date, format_and_filter_rows, calculate_trend_and_recent, pivot_df
 from utils import create_df_from_csv
 import pandas as pd
@@ -98,6 +98,16 @@ def clean_training_dataset():
 #     # Clean training dataset
 #     clean_training_dataset()
 
+
+def calculate_word_count(row):
+    file_name = row['url'].split('/')[-1]
+    file_path = f'./data/sec-ipo-files/{row["symbol"]}/{file_name}'
+    text_content = clean_html_file_and_get_text(file_path)
+    
+    # Count words (split by whitespace)
+    word_count = len(text_content.split())
+    return word_count
+
 def calculate_document_length(row):
     file_name = row['url'].split('/')[-1]
     file_path = f'./data/sec-ipo-files/{row["symbol"]}/{file_name}'
@@ -107,8 +117,7 @@ def calculate_document_length(row):
 def main():
     df = create_df_from_csv("./datasets/all_financial_with_keywords.csv")
     df['document_length'] = df.apply(calculate_document_length, axis=1)
+    df['word_count'] = df.apply(calculate_word_count, axis=1)
     df.to_csv("./datasets/all_financial_with_keywords_test.csv", index=False)
-
-
 
 main()

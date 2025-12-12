@@ -2,6 +2,7 @@ import re
 from utils import make_new_dir, remove_empty_columns_from_df
 import pandas as pd
 from io import StringIO
+from bs4 import BeautifulSoup
 
 finance_keywords= ['Revenue', 'Accounts Receivable', 'Liabilities', 'Assets', 'Cash', 'Common Stock', 'Differed Tax', 'Inventory', 'Earnings', 'Operating Loss', 'Months Ended', 'Year Ended', 'Depreciation']
 column_keywords = ['Six Months End', 'Twelve Months End', 'Year Ended', 'Six Months Ended', 'Twelve Months Ended', 'Years Ended', 'Years End', 'Period From']
@@ -23,6 +24,27 @@ def clean_html_file_and_stringify(file_path):
     html_content = re.sub(r'<!doctype[^>]*>(.*)', r'<!DOCTYPE \1>', html_content)
 
     return html_content
+
+def clean_html_file_and_get_text(file_path):
+    with open(file_path, 'r', encoding='utf-8') as file:
+        html_content = file.read()
+    
+    # Use BeautifulSoup to parse and extract text content
+    soup = BeautifulSoup(html_content, 'html.parser')
+    
+    # Remove script and style elements
+    for script in soup(["script", "style"]):
+        script.decompose()
+    
+    # Get text content
+    text = soup.get_text()
+    
+    # Clean up whitespace
+    lines = (line.strip() for line in text.splitlines())
+    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+    text = ' '.join(chunk for chunk in chunks if chunk)
+    
+    return text
 
 def create_df_from_html_tables(html_content):
     try:
